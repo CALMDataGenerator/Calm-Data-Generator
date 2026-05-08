@@ -232,7 +232,7 @@ synthetic_df = preset.generate(data=adata_df, n_samples=500)
 ```
 
 ## Librerías Clave y Ecosistema
- 
+
  | Librería | Rol | Uso en Calm-Data-Generator |
  | :--- | :--- | :--- |
  | **Synthcity** | Motor de Deep Learning | Potencia `CTGAN`, `TVAE`, `DDPM`, `TimeGAN`. Manejo de privacidad y fidelidad. |
@@ -264,16 +264,16 @@ Una ventaja clave de **Calm-Data-Generator** es permitir el uso de datos privado
 ---
 
 ## Instalación
- 
+
  > [!WARNING]
  > **Aviso Importante**: Esta librería depende de frameworks de Deep Learning pesados como `PyTorch`, `Synthcity` y librerías `CUDA`.
  > La instalación puede ser **pesada (~2-3 GB)** y tardar unos minutos dependiendo de tu conexión. Recomendamos encarecidamente usar un entorno virtual limpio.
- 
+
  ### Estrategia de Versiones
- 
+
  - **GitHub (Recomendado para últimas novedades)**: La rama `main` contiene la versión más actualizada con los últimos arreglos y funcionalidades.
  - **PyPI (Estable)**: Las versiones en PyPI son estables y se actualizan con menor frecuencia para cambios mayores.
- 
+
  ### Instalación Estándar (PyPI - Estable)
  La librería está disponible en PyPI. Para una experiencia estable, recomendamos usar un entorno virtual:
 
@@ -340,6 +340,20 @@ pip install calm-data-generator
 2. Instala "Desktop development with C++"
 3. Luego reintenta la instalación
 
+**Windows — Error de ruta larga durante la instalación:**
+
+Algunos paquetes (p. ej. `orbax-checkpoint`) contienen estructuras de directorios muy profundas que superan el límite predeterminado de 260 caracteres de ruta en Windows. Si ves un error como:
+```
+OSError: [Errno 2] No such file or directory: 'C:\...\ruta\muy\larga'
+HINT: This error might have occurred since this system does not have Windows Long Path support enabled.
+```
+Activa las rutas largas desde PowerShell (como Administrador):
+```powershell
+New-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem" `
+  -Name "LongPathsEnabled" -Value 1 -PropertyType DWORD -Force
+```
+Reinicia el equipo y vuelve a intentar la instalación. Alternativamente, instala tu entorno virtual en una ruta corta (p. ej. `C:\venv\`) para reducir la longitud total de la ruta.
+
 **PyTorch solo-CPU (sin GPU):**
 ```bash
 pip install torch --index-url https://download.pytorch.org/whl/cpu
@@ -371,10 +385,10 @@ synthetic = gen.generate(
     target_col='label',
     differentiation_factor=2.0, # NUEVO: Mejora la separabilidad de clases
     clipping_mode='permissive', # NUEVO: Gestión de rangos de datos
-    epochs=300, 
+    epochs=300,
     batch_size=500,
     discriminator_steps=1
-   
+
 )
 
 print(f"Generadas {len(synthetic)} muestras")
@@ -400,9 +414,9 @@ synthetic = gen.generate(
     data=data,
     n_samples=1000,
     method='ctgan',
-    epochs=300, 
+    epochs=300,
     enable_gpu=True,
-   
+
 )
 ```
 

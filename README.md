@@ -228,7 +228,7 @@ synthetic_df = preset.generate(data=adata_df, n_samples=500)
 ```
 
 ## Key Libraries & Ecosystem
- 
+
  | Library | Role | Usage in Calm-Data-Generator |
  | :--- | :--- | :--- |
  | **Synthcity** | Deep Learning Engine | Powers `CTGAN`, `TVAE`, `DDPM`, `TimeGAN`. Handling privacy & fidelity. |
@@ -272,15 +272,15 @@ Minimalist view of the system's core components and data flow.
 ---
 
 ## Installation
- 
+
  > [!WARNING]
  > The installation might be **heavy (~2-3 GB)** and take a few minutes depending on your internet connection. We strongly recommend using a fresh virtual environment.
- 
+
  ### Versioning Strategy
- 
+
  - **GitHub (Recommended for latest features)**: The `main` branch contains the most up-to-date version with the latest bug fixes and features.
  - **PyPI (Stable)**: Releases on PyPI are stable versions updated less frequently for major changes.
- 
+
  ### Standard Installation (PyPI - Stable)
  The library is available on PyPI. For the most stable experience, we recommend using a virtual environment:
 
@@ -347,6 +347,20 @@ pip install calm-data-generator
 1. Download [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/)
 2. Install "Desktop development with C++"
 3. Then retry installation
+
+**Windows — Long Path error during installation:**
+
+Some packages (e.g. `orbax-checkpoint`) contain very deep directory structures that exceed the Windows default 260-character path limit. If you see an error like:
+```
+OSError: [Errno 2] No such file or directory: 'C:\...\very\long\path'
+HINT: This error might have occurred since this system does not have Windows Long Path support enabled.
+```
+Enable long paths via PowerShell (run as Administrator):
+```powershell
+New-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem" `
+  -Name "LongPathsEnabled" -Value 1 -PropertyType DWORD -Force
+```
+Then restart your machine and retry installation. Alternatively, install your virtual environment in a short root path (e.g. `C:\venv\`) to reduce total path length.
 
 **PyTorch CPU-only (no GPU):**
 ```bash
@@ -415,9 +429,9 @@ synthetic = gen.generate(
     data=data,
     n_samples=1000,
     method='ctgan',
-    epochs=300, 
+    epochs=300,
     enable_gpu=True,
-   
+
 )
 ```
 
@@ -517,7 +531,7 @@ synthetic = gen.generate(
     target_col='cell_type',
     epochs=100,
     n_latent=10,
-    
+
 )
 
 

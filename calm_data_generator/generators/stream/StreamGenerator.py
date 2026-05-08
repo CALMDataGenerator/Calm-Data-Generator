@@ -1,16 +1,18 @@
 import os
 import random
 import warnings
-from typing import Optional, Dict, Tuple, List, Iterator, Any, Union
-import pandas as pd
-import numpy as np
 from collections import defaultdict
+from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
 
+import numpy as np
+import pandas as pd
+
+from calm_data_generator.generators.base import BaseGenerator
 from calm_data_generator.generators.configs import DateConfig, DriftConfig, ReportConfig
-from .StreamReporter import StreamReporter  # reporter to save JSON reports
 from calm_data_generator.generators.drift.DriftInjector import DriftInjector
 from calm_data_generator.generators.dynamics.ScenarioInjector import ScenarioInjector
-from calm_data_generator.generators.base import BaseGenerator
+
+from .StreamReporter import StreamReporter  # reporter to save JSON reports
 
 # Suppress common warnings for cleaner output
 warnings.filterwarnings("ignore", category=UserWarning)
@@ -560,8 +562,10 @@ class StreamGenerator(BaseGenerator):
         rows = []
         for i in range(n_samples):
             it = drift_iter if self.rng.random() < w[i] else base_iter
-
-            x, y = next(it)
+            try:
+                x, y = next(it)
+            except StopIteration:
+                break
             rows.append(list(x.values()) + [y])
         return rows
 
@@ -712,8 +716,7 @@ class StreamGenerator(BaseGenerator):
             entity_col = sequence_config.get("entity_col", "entity_id")
             avg_events = sequence_config.get("events_per_entity", 10)
 
-            # Approximate number of entities
-            max(1, n_rows // avg_events)
+            # Approximate number of entities (used to assign IDs below)
 
             # Assign IDs
             ids = []
@@ -732,8 +735,6 @@ class StreamGenerator(BaseGenerator):
             # Generate timestamps per entity
             # We assume users start at random times within a window, or all at start_date
             base_start = pd.to_datetime(date_start)
-
-            np.zeros(n_rows, dtype="datetime64[ns]")
 
             # Group by ID (simple iteration for now, optimized vectorization possible but complex)
             # To be fast, we process by group

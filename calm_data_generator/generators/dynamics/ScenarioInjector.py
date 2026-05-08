@@ -1,12 +1,14 @@
-import pandas as pd
-import numpy as np
-from typing import Dict, Optional, Union, Callable
 import os
+from typing import Callable, Dict, Optional, Union
+
+import numpy as np
+import pandas as pd
+
 from calm_data_generator.generators.configs import (
-    ScenarioConfig,
     EvolutionFeatureConfig,
+    ScenarioConfig,
 )
-from calm_data_generator.generators.utils.propagation import propagate_numeric_drift, apply_func
+from calm_data_generator.generators.utils.propagation import apply_func, propagate_numeric_drift
 
 
 class ScenarioInjector:
@@ -125,7 +127,7 @@ class ScenarioInjector:
             elif drift_type == "exponential_growth":
                 rate = config.rate if config.rate is not None else 0.01
                 # y = x * (1 + rate)^t  => delta = x * ((1+rate)^t - 1)
-                # But here we apply delta + INITIAL values. 
+                # But here we apply delta + INITIAL values.
                 # To be consistent with additive logic, we calculate delta from base
                 base_values = df_evolved[col].values
                 delta = base_values * ((1 + rate) ** t - 1)
@@ -203,7 +205,7 @@ class ScenarioInjector:
             affected_cols = list(evolution_configs.keys())
 
             # Dump for reporting
-            evolution_config_dump = {k: v.dict() for k, v in evolution_configs.items()}
+            evolution_config_dump = {k: v.model_dump() for k, v in evolution_configs.items()}
 
             drift_config = {
                 "generator_name": generator_name,

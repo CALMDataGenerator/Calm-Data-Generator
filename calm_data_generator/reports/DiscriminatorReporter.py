@@ -188,8 +188,7 @@ class DiscriminatorReporter:
 
         for col in X_df.select_dtypes(include=["object", "category"]).columns:
             le = LabelEncoder()
-            # Handle potential new categories in test by casting to string
-            X_df[col] = X_df[col].astype(str)
+            X_df[col] = X_df[col].fillna("__NaN__").astype(str)
             X_df[col] = le.fit_transform(X_df[col])
             encoders[col] = le
 
@@ -212,6 +211,10 @@ class DiscriminatorReporter:
 
         if not PLOTLY_AVAILABLE:
             return None
+
+        if len(np.unique(y_test)) < 2:
+            self.logger.warning("Only one class in y_test — skipping ROC curve generation.")
+            return filepath
 
         # ROC Curve
         fpr, tpr, thresholds = roc_curve(y_test, y_scores)

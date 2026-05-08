@@ -15,14 +15,16 @@ Key Features:
 - **Integrated Reporting**: Automatically generates detailed reports and visualizations comparing the original and drifted datasets.
 """
 
-import pandas as pd
-import numpy as np
-from typing import List, Optional, Dict, Sequence, Tuple, Any, Union
-import warnings
 import os
-from calm_data_generator.reports.QualityReporter import QualityReporter
+import warnings
+from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
+
+import numpy as np
+import pandas as pd
+
 from calm_data_generator.generators.configs import DriftConfig
-from calm_data_generator.generators.utils.propagation import propagate_numeric_drift, apply_func
+from calm_data_generator.generators.utils.propagation import apply_func, propagate_numeric_drift
+from calm_data_generator.reports.QualityReporter import QualityReporter
 
 # Suppress common warnings for cleaner output
 warnings.filterwarnings("ignore", category=UserWarning)
@@ -105,6 +107,11 @@ class DriftInjector:
             os.makedirs(self.output_dir, exist_ok=True)
 
     @staticmethod
+    def _check_column_exists(df: pd.DataFrame, col: str) -> bool:
+        """Returns False and is falsy if col is missing from df."""
+        return col in df.columns
+
+    @staticmethod
     def _frac(x: float) -> float:
         """Clips a float to the [0.0, 1.0] range."""
         return float(np.clip(x, 0.0, 1.0))
@@ -128,9 +135,14 @@ class DriftInjector:
             resample_rule=resample_rule,
         )
 
-    @staticmethod
-    def _ensure_psd_matrix(matrix: np.ndarray) -> np.ndarray:
+    _psd_cache: dict = {}
+
+    @classmethod
+    def _ensure_psd_matrix(cls, matrix: np.ndarray) -> np.ndarray:
         """Ensures a matrix is positive semi-definite (PSD) by adjusting its eigenvalues."""
+        key = matrix.tobytes()
+        if key in cls._psd_cache:
+            return cls._psd_cache[key]
         eigenvalues, eigenvectors = np.linalg.eigh(matrix)
         eigenvalues[eigenvalues < 1e-6] = 1e-6  # Clamp small eigenvalues
         psd_matrix = eigenvectors @ np.diag(eigenvalues) @ eigenvectors.T
@@ -138,6 +150,7 @@ class DriftInjector:
         d = np.sqrt(np.diag(psd_matrix))
         d_inv = np.where(d > 1e-9, 1.0 / d, 0)
         psd_matrix = np.diag(d_inv) @ psd_matrix @ np.diag(d_inv)
+        cls._psd_cache[key] = psd_matrix
         return psd_matrix
 
     def _get_target_rows(
@@ -2167,13 +2180,20 @@ class DriftInjector:
             for cond in conditions:
                 col, op, val = cond["column"], cond["operator"], cond["value"]
                 series = df_result.loc[rows, col]
-                if op == ">":   mask &= series > val
-                elif op == ">=": mask &= series >= val
-                elif op == "<":  mask &= series < val
-                elif op == "<=": mask &= series <= val
-                elif op == "==": mask &= series == val
-                elif op == "!=": mask &= series != val
-                elif op == "in": mask &= series.isin(val)
+                if op == ">":
+                    mask &= series > val
+                elif op == ">=":
+                    mask &= series >= val
+                elif op == "<":
+                    mask &= series < val
+                elif op == "<=":
+                    mask &= series <= val
+                elif op == "==":
+                    mask &= series == val
+                elif op == "!=":
+                    mask &= series != val
+                elif op == "in":
+                    mask &= series.isin(val)
             rows = rows[mask]
 
         driver_values = df_result.loc[rows, driver_col].values
@@ -2283,13 +2303,20 @@ class DriftInjector:
             for cond in conditions:
                 col, op, val = cond["column"], cond["operator"], cond["value"]
                 series = df_result.loc[rows, col]
-                if op == ">":    mask &= series > val
-                elif op == ">=": mask &= series >= val
-                elif op == "<":  mask &= series < val
-                elif op == "<=": mask &= series <= val
-                elif op == "==": mask &= series == val
-                elif op == "!=": mask &= series != val
-                elif op == "in": mask &= series.isin(val)
+                if op == ">":
+                    mask &= series > val
+                elif op == ">=":
+                    mask &= series >= val
+                elif op == "<":
+                    mask &= series < val
+                elif op == "<=":
+                    mask &= series <= val
+                elif op == "==":
+                    mask &= series == val
+                elif op == "!=":
+                    mask &= series != val
+                elif op == "in":
+                    mask &= series.isin(val)
             rows = rows[mask]
 
         engine = CausalEngine(dag_config)

@@ -1,5 +1,6 @@
-from typing import Optional, Dict, List, Union, Any, Literal
-from pydantic import BaseModel, Field, ConfigDict
+from typing import Any, Dict, List, Literal, Optional, Union
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class DateConfig(BaseModel):
@@ -46,6 +47,28 @@ class DriftConfig(BaseModel):
     # Extra params for specific methods (e.g., custom params for custom drift)
     params: Dict[str, Any] = Field(default_factory=dict)
 
+    @field_validator("magnitude")
+    @classmethod
+    def magnitude_positive(cls, v: float) -> float:
+        if v <= 0:
+            raise ValueError("magnitude must be > 0")
+        return v
+
+    @field_validator("profile")
+    @classmethod
+    def profile_valid(cls, v: str) -> str:
+        valid = {"linear", "sigmoid", "cosine"}
+        if v not in valid:
+            raise ValueError(f"profile must be one of {valid}")
+        return v
+
+    @model_validator(mode="after")
+    def start_before_end(self) -> "DriftConfig":
+        if self.start_index is not None and self.end_index is not None:
+            if self.start_index >= self.end_index:
+                raise ValueError("start_index must be < end_index")
+        return self
+
     model_config = ConfigDict(extra="allow")  # Allow extra fields for flexibility
 
 
@@ -62,7 +85,7 @@ class EvolutionFeatureConfig(BaseModel):
     phase: Optional[float] = 0.0
     center: Optional[float] = None
     width: Optional[float] = None
-    
+
     # Extra parameters for specific evolution types
     rate: Optional[float] = None      # for exponential_growth, decay
     noise_std: Optional[float] = None # for noise
@@ -74,6 +97,23 @@ class EvolutionFeatureConfig(BaseModel):
     driver_col: Optional[str] = None      # column whose current value drives the delta
     func: Optional[str] = None            # "linear"|"exponential"|"power"|"polynomial"
     func_params: Optional[dict] = None    # parameters for func
+
+    _VALID_TYPES = {"linear", "cycle", "sigmoid", "exponential_growth", "exponential_decay", "noise", "random_walk", "step", "driven_by"}
+
+    @field_validator("type")
+    @classmethod
+    def type_valid(cls, v: str) -> str:
+        valid = {"linear", "trend", "cycle", "sinusoidal", "sigmoid", "exponential_growth", "exponential_decay", "noise", "random_walk", "step", "driven_by"}
+        if v not in valid:
+            raise ValueError(f"type must be one of {valid}")
+        return v
+
+    @field_validator("period")
+    @classmethod
+    def period_positive(cls, v: Optional[float]) -> Optional[float]:
+        if v is not None and v <= 0:
+            raise ValueError("period must be > 0")
+        return v
 
     model_config = ConfigDict(extra="allow")  # Allow extra fields for flexibility
 
@@ -110,3 +150,13 @@ class ReportConfig(BaseModel):
     per_block_external_reports: bool = False
     use_scgft: bool = False
 
+    @field_validator("resample_rule")
+    @classmethod
+    def resample_rule_valid(cls, v: Optional[Union[str, int]]) -> Optional[Union[str, int]]:
+        if v is not None and isinstance(v, str):
+            import pandas as pd
+            try:
+                pd.tseries.frequencies.to_offset(v)
+            except ValueError:
+                raise ValueError(f"resample_rule '{v}' is not a valid pandas frequency string")
+        return v

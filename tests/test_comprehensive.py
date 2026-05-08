@@ -1,8 +1,10 @@
-import pandas as pd
-import numpy as np
-import tempfile
 import os
+import tempfile
+
+import numpy as np
+import pandas as pd
 import pytest
+
 from calm_data_generator.generators.configs import DriftConfig, ReportConfig
 
 
@@ -71,14 +73,14 @@ def test_real_generator_methods(sample_data):
     try:
         synth = gen.generate(sample_data, 10, method="ctgan", epochs=1)
         assert synth is not None and len(synth) == 10
-    except Exception as e:
+    except (ImportError, RuntimeError) as e:
         print(f"Skipping CTGAN test: {e}")
 
     # TVAE (skip if synthcity fails)
     try:
         synth = gen.generate(sample_data, 10, method="tvae", epochs=1)
         assert synth is not None and len(synth) == 10
-    except Exception as e:
+    except (ImportError, RuntimeError) as e:
         print(f"Skipping TVAE test: {e}")
 
 

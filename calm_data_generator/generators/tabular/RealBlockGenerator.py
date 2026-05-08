@@ -137,10 +137,10 @@ class RealBlockGenerator(RealGenerator):
         """
         Generates synthetic data for a specific block by creating a temporary RealGenerator instance for that block.
         """
-        block_data_no_block = block_data.drop(columns=[block_column])
-
         if len(block_data) == 0:
             raise ValueError(f"No data found for block: {block_id}")
+
+        block_data_no_block = block_data.drop(columns=[block_column])
 
         if n_samples is None:
             n_samples = len(block_data)

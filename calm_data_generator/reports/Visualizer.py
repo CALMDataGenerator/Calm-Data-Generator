@@ -3,17 +3,18 @@ Visualizer Module
 Generates interactive Plotly HTML plots for data visualization.
 """
 
-import os
-import pandas as pd
-import numpy as np
-from typing import Optional, List, Dict, Any
 import logging
+import os
+from typing import Any, Dict, List, Optional
+
+import numpy as np
+import pandas as pd
 
 try:
     import plotly.express as px
     import plotly.graph_objects as go
-    from plotly.subplots import make_subplots
     import plotly.io as pio
+    from plotly.subplots import make_subplots
 
     PLOTLY_AVAILABLE = True
 except ImportError:
@@ -178,11 +179,19 @@ class Visualizer:
                 logger.warning("Not enough samples for dimensionality reduction.")
                 return None
 
+            if numeric_df.empty:
+                logger.warning("No data remaining after dropping NaN rows.")
+                return None
+
             # Standardize
             scaler = StandardScaler()
             scaled_data = scaler.fit_transform(numeric_df)
 
             # === PCA ===
+            # For very wide data, truncate to 500 components first to avoid memory/speed issues
+            if scaled_data.shape[1] > 500:
+                pre_pca = PCA(n_components=500, random_state=42)
+                scaled_data = pre_pca.fit_transform(scaled_data)
             pca = PCA(n_components=2)
             pca_result = pca.fit_transform(scaled_data)
 
@@ -443,6 +452,8 @@ class Visualizer:
                     # JS Divergence
                     min_val = min(orig_vals.min(), drift_vals.min())
                     max_val = max(orig_vals.max(), drift_vals.max())
+                    if min_val == max_val:
+                        continue
                     bins = np.linspace(min_val, max_val, 50)
                     hist_orig, _ = np.histogram(orig_vals, bins=bins, density=True)
                     hist_drift, _ = np.histogram(drift_vals, bins=bins, density=True)
@@ -538,7 +549,7 @@ class Visualizer:
                 html_parts.append(f"""
                 <div style="font-family: 'Segoe UI', sans-serif; padding: 20px; max-width: 1200px; margin: auto;">
                     <h1 style="color: #333;">🌊 Drift Analysis Report</h1>
-                    
+
                     <div style="display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 30px;">
                         <div style="background: linear-gradient(135deg, #667eea, #764ba2); color: white; padding: 20px; border-radius: 12px; flex: 1; min-width: 200px;">
                             <div style="font-size: 14px; opacity: 0.8;">AFFECTED COLUMNS</div>
@@ -559,7 +570,7 @@ class Visualizer:
                     </div>
                 """)
             else:
-                html_parts.append(f"""
+                html_parts.append("""
                 <div style="font-family: 'Segoe UI', sans-serif; padding: 20px; max-width: 1200px; margin: auto;">
                     <h1 style="color: #333;">📊 Statistical Distribution Comparison</h1>
                     <p style="color: #666; margin-bottom: 30px;">Comparison of statistical properties between Original and Synthetic datasets.</p>
@@ -765,7 +776,6 @@ class Visualizer:
             subset = subset.sort_values(by=[entity_col, time_col])
 
             # Create subplots
-            n_cols = 1
             n_rows = min(len(plot_cols), 5)  # Max 5 features stacked
             plot_cols = plot_cols[:n_rows]
 
@@ -869,11 +879,9 @@ class Visualizer:
             if time_col and time_col in original_df.columns:
                 x_orig = original_df[time_col]
                 x_evolved = evolved_df[time_col]
-                x_label = time_col
             else:
                 x_orig = np.arange(len(original_df))
                 x_evolved = np.arange(len(evolved_df))
-                x_label = "Index"
 
             for i, col in enumerate(evolved_cols[:n_rows]):
                 config = evolution_config.get(col, {})

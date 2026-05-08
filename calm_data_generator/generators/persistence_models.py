@@ -32,8 +32,8 @@ except ImportError:
 
 
 try:
-    import pandas as pd
     import numpy as np
+    import pandas as pd
 
     class FCSModel:
         """
@@ -109,10 +109,12 @@ try:
                             preds_idx = (draws < p1).astype(int)
                             new_vals = classes[preds_idx]
                         else:
-                            # Slow row-wise sampling for multiclass
-                            new_vals = np.array(
-                                [self.rng.choice(classes, p=p) for p in probs]
-                            )
+                            # Vectorized multiclass sampling via cumsum + searchsorted
+                            probs_norm = probs / probs.sum(axis=1, keepdims=True)
+                            cum = np.cumsum(probs_norm, axis=1)
+                            draws = self.rng.random(len(cum))
+                            preds_idx = (draws[:, None] > cum).sum(axis=1).clip(0, len(classes) - 1)
+                            new_vals = classes[preds_idx]
                     except Exception as e:
                         _logger.warning(f"predict_proba failed; falling back to predict(). Reason: {e}")
                         # Fallback to direct prediction if proba fails

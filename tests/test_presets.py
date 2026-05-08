@@ -1,27 +1,28 @@
-import pytest
-import pandas as pd
 import numpy as np
+import pandas as pd
+import pytest
+
+from calm_data_generator.presets.BalancePreset import BalancedDataGeneratorPreset
+from calm_data_generator.presets.ConceptDriftPreset import ConceptDriftPreset
+from calm_data_generator.presets.CopulaPreset import CopulaPreset
+from calm_data_generator.presets.DataQualityAuditPreset import DataQualityAuditPreset
+from calm_data_generator.presets.DiffusionPreset import DiffusionPreset
+from calm_data_generator.presets.DriftScenarioPreset import DriftScenarioPreset
+from calm_data_generator.presets.FastPrototypePreset import FastPrototypePreset
+from calm_data_generator.presets.GradualDriftPreset import GradualDriftPreset
 from calm_data_generator.presets.HighFidelityPreset import HighFidelityPreset
 from calm_data_generator.presets.ImbalancePreset import ImbalancedGeneratorPreset
-from calm_data_generator.presets.BalancePreset import BalancedDataGeneratorPreset
-from calm_data_generator.presets.SingleCellQualityPreset import SingleCellQualityPreset
-from calm_data_generator.presets.FastPrototypePreset import FastPrototypePreset
-from calm_data_generator.presets.TimeSeriesPreset import TimeSeriesPreset
-from calm_data_generator.presets.DriftScenarioPreset import DriftScenarioPreset
-from calm_data_generator.presets.RareDiseasePreset import RareDiseasePreset
-from calm_data_generator.presets.DiffusionPreset import DiffusionPreset
-from calm_data_generator.presets.ConceptDriftPreset import ConceptDriftPreset
-from calm_data_generator.presets.GradualDriftPreset import GradualDriftPreset
-from calm_data_generator.presets.DataQualityAuditPreset import DataQualityAuditPreset
-from calm_data_generator.presets.CopulaPreset import CopulaPreset
 from calm_data_generator.presets.LongitudinalHealthPreset import (
     LongitudinalHealthPreset,
 )
 from calm_data_generator.presets.OmicsIntegrationPreset import OmicsIntegrationPreset
+from calm_data_generator.presets.RareDiseasePreset import RareDiseasePreset
+from calm_data_generator.presets.ScenarioInjectorPreset import ScenarioInjectorPreset
 from calm_data_generator.presets.SeasonalTimeSeriesPreset import (
     SeasonalTimeSeriesPreset,
 )
-from calm_data_generator.presets.ScenarioInjectorPreset import ScenarioInjectorPreset
+from calm_data_generator.presets.SingleCellQualityPreset import SingleCellQualityPreset
+from calm_data_generator.presets.TimeSeriesPreset import TimeSeriesPreset
 
 
 @pytest.fixture
@@ -230,8 +231,7 @@ class TestDataQualityAuditPreset:
         try:
             synthetic_data = preset.generate(dummy_data, n_samples=5, auto_report=False)
             assert len(synthetic_data) == 5
-        except Exception as e:
-            # TVAE often fails on tiny data or missing dependencies
+        except (ImportError, RuntimeError) as e:
             pytest.skip(f"TVAE execution failed: {e}")
 
 

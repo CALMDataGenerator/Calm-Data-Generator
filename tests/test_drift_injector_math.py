@@ -1,6 +1,7 @@
-import pytest
-import pandas as pd
 import numpy as np
+import pandas as pd
+import pytest
+
 from calm_data_generator.generators.drift import DriftInjector
 
 
@@ -55,7 +56,7 @@ def test_drift_math_validation(base_df):
         )
 
     # Magnitude < 0 for noise
-    with pytest.raises(ValueError, match="drift_magnitude must be >= 0"):
+    with pytest.raises(ValueError, match="magnitude"):
         injector.inject_feature_drift(
             df=base_df,
             feature_cols=["A"],

@@ -242,33 +242,12 @@ class QualityReporter(BaseReporter):
             real_df_for_report = real_df
             synthetic_df_for_report = synthetic_df
 
-        # ===  Quality Assessment ===
-        sdmetrics_quality = self._assess_quality_scores(
-            real_df_for_report, synthetic_df_for_report
+        # === Quality Assessment ===
+        sdmetrics_quality, sequential_quality, privacy_metrics = self._run_quality_assessment(
+            real_df, real_df_for_report, synthetic_df, synthetic_df_for_report,
+            generator_name, block_column, final_time_col, privacy_check,
+            output_dir, target_column,
         )
-
-        # === Sequential Quality Assessment ===
-        sequential_quality = None
-        if time_col and block_column and SEQUENTIAL_SDMETRICS_AVAILABLE:
-            # Heuristic: Only run if explicit time/block provided
-            sequential_quality = self._assess_sequential_quality(
-                real_df, synthetic_df, block_column, final_time_col
-            )
-
-        # === Privacy Assessment (DCR) ===
-        privacy_metrics = None
-        if privacy_check or "dp" in generator_name.lower():
-            privacy_metrics = self._calculate_dcr_privacy(real_df, synthetic_df)
-
-        # Generate Quality Scores Card
-        if "overall_quality_score" in sdmetrics_quality:
-            if self.verbose:
-                print("\nGenerating Quality Scores Card...")
-            Visualizer.generate_quality_scores_card(
-                overall_score=sdmetrics_quality["overall_quality_score"],
-                weighted_score=sdmetrics_quality["weighted_quality_score"],
-                output_dir=output_dir,
-            )
 
         # === Quality Scores by Block (for evolution plot) ===
         quality_scores_by_block = []
@@ -292,13 +271,8 @@ class QualityReporter(BaseReporter):
             "real_rows": len(real_df),
             "synthetic_rows": len(synthetic_df),
             "quality_scores": sdmetrics_quality,
-            "quality_by_block": quality_scores_by_block
-            if quality_scores_by_block
-            else None,
-            "compared_data_files": {
-                "original": "real_data",
-                "generated": "synthetic_data",
-            },
+            "quality_by_block": quality_scores_by_block if quality_scores_by_block else None,
+            "compared_data_files": {"original": "real_data", "generated": "synthetic_data"},
             "sequential_quality": sequential_quality,
             "privacy_metrics": privacy_metrics,
             "constraints_stats": constraints_stats,
@@ -310,10 +284,80 @@ class QualityReporter(BaseReporter):
             json.dump(results, f, indent=2, cls=NumpyEncoder)
 
         # === Generate Plotly Visualizations ===
+        self._run_visualizations(
+            real_df_for_report, synthetic_df_for_report,
+            output_dir, focus_cols, target_column, drift_config,
+            use_minimal, adversarial_validation,
+        )
+
+        # === Generate YData Reports ===
+        self._run_ydata_reports(
+            real_df_for_report, synthetic_df_for_report,
+            output_dir, final_time_col, block_column, use_minimal,
+        )
+
+        # === scGFT Single-Cell Evaluation ===
+        if use_scgft:
+            self._run_scgft_evaluation(real_df_for_report, synthetic_df_for_report, output_dir, target_column)
+
+        # === Generate Dashboard ===
+        LocalIndexGenerator.create_index(output_dir)
+
+        if self.verbose:
+            print(f"\nReport generated at: {output_dir}")
+
+    def _run_quality_assessment(
+        self,
+        real_df: pd.DataFrame,
+        real_df_for_report: pd.DataFrame,
+        synthetic_df: pd.DataFrame,
+        synthetic_df_for_report: pd.DataFrame,
+        generator_name: str,
+        block_column: Optional[str],
+        final_time_col: Optional[str],
+        privacy_check: bool,
+        output_dir: str,
+        target_column: Optional[str],
+    ):
+        """Runs SDMetrics, sequential quality, and privacy checks. Returns (sdmetrics_quality, sequential_quality, privacy_metrics)."""
+        sdmetrics_quality = self._assess_quality_scores(real_df_for_report, synthetic_df_for_report)
+
+        sequential_quality = None
+        if final_time_col and block_column and SEQUENTIAL_SDMETRICS_AVAILABLE:
+            sequential_quality = self._assess_sequential_quality(
+                real_df, synthetic_df, block_column, final_time_col
+            )
+
+        privacy_metrics = None
+        if privacy_check or "dp" in generator_name.lower():
+            privacy_metrics = self._calculate_dcr_privacy(real_df, synthetic_df)
+
+        if "overall_quality_score" in sdmetrics_quality:
+            if self.verbose:
+                print("\nGenerating Quality Scores Card...")
+            Visualizer.generate_quality_scores_card(
+                overall_score=sdmetrics_quality["overall_quality_score"],
+                weighted_score=sdmetrics_quality["weighted_quality_score"],
+                output_dir=output_dir,
+            )
+
+        return sdmetrics_quality, sequential_quality, privacy_metrics
+
+    def _run_visualizations(
+        self,
+        real_df_for_report: pd.DataFrame,
+        synthetic_df_for_report: pd.DataFrame,
+        output_dir: str,
+        focus_cols: Optional[List[str]],
+        target_column: Optional[str],
+        drift_config: Optional[Dict[str, Any]],
+        use_minimal: bool,
+        adversarial_validation: bool,
+    ) -> None:
+        """Generates Plotly visualizations: density, PCA, comparison, discriminator."""
         if self.verbose:
             print("\nGenerating Plotly Visualizations...")
 
-        # Density plots (on synthetic data)
         Visualizer.generate_density_plots(
             df=synthetic_df_for_report,
             output_dir=output_dir,
@@ -321,7 +365,6 @@ class QualityReporter(BaseReporter):
             color_col=target_column,
         )
 
-        # Combined PCA + UMAP (real + synthetic merged) - Skip in minimal mode
         if not use_minimal:
             combined_df = pd.concat(
                 [
@@ -338,13 +381,9 @@ class QualityReporter(BaseReporter):
         elif self.verbose:
             print("   -> Skipping PCA/UMAP (minimal mode)")
 
-        # New quality score calculation based on minimal mode
-        # New quality score calculation based on minimal mode
-        if use_minimal:
-            if self.verbose:
-                print("   -> Skipping full quality assessment (minimal mode)")
+        if use_minimal and self.verbose:
+            print("   -> Skipping full quality assessment (minimal mode)")
 
-        # Drift Analysis (comparing real vs synthetic)
         Visualizer.generate_comparison_plots(
             original_df=real_df_for_report,
             drifted_df=synthetic_df_for_report,
@@ -353,8 +392,6 @@ class QualityReporter(BaseReporter):
             drift_config=drift_config,
         )
 
-        # Run Discriminator Reporter (Adversarial Validation)
-        # Note: We use the prepared data for reporting
         if adversarial_validation and not use_minimal:
             try:
                 self.discriminator_reporter.generate_report(
@@ -367,7 +404,16 @@ class QualityReporter(BaseReporter):
             except Exception as e:
                 self.logger.error(f"Discriminator report generation failed: {e}")
 
-        # === Generate YData Reports (Global) ===
+    def _run_ydata_reports(
+        self,
+        real_df_for_report: pd.DataFrame,
+        synthetic_df_for_report: pd.DataFrame,
+        output_dir: str,
+        final_time_col: Optional[str],
+        block_column: Optional[str],
+        use_minimal: bool,
+    ) -> None:
+        """Generates YData Profiling comparison and per-block reports."""
         if self.verbose:
             print("\nGenerating YData Reports...")
 
@@ -392,7 +438,6 @@ class QualityReporter(BaseReporter):
             minimal=use_minimal,
         )
 
-        # === Generate Per-Block Reports (as requested) ===
         if block_column and block_column in real_df_for_report.columns:
             if self.verbose:
                 print(f"\nGenerating Per-Block Reports (Block Col: {block_column})...")
@@ -402,18 +447,12 @@ class QualityReporter(BaseReporter):
             os.makedirs(blocks_dir, exist_ok=True)
 
             for block_id in blocks:
-                # Filter data for this block
-                real_blk = real_df_for_report[
-                    real_df_for_report[block_column] == block_id
-                ]
-                synth_blk = synthetic_df_for_report[
-                    synthetic_df_for_report[block_column] == block_id
-                ]
+                real_blk = real_df_for_report[real_df_for_report[block_column] == block_id]
+                synth_blk = synthetic_df_for_report[synthetic_df_for_report[block_column] == block_id]
 
                 if real_blk.empty or synth_blk.empty:
                     continue
 
-                # Generate comparison for this block
                 block_out_dir = os.path.join(blocks_dir, f"block_{str(block_id)}")
                 os.makedirs(block_out_dir, exist_ok=True)
 
@@ -423,19 +462,9 @@ class QualityReporter(BaseReporter):
                     output_dir=block_out_dir,
                     ref_name=f"Block {block_id} (Real)",
                     curr_name=f"Block {block_id} (Synth)",
-                    time_col=final_time_col,  # Time series mode active if this is set
+                    time_col=final_time_col,
                     minimal=use_minimal,
                 )
-
-        # === scGFT Single-Cell Evaluation ===
-        if use_scgft:
-            self._run_scgft_evaluation(real_df_for_report, synthetic_df_for_report, output_dir, target_column)
-
-        # === Generate Dashboard ===
-        LocalIndexGenerator.create_index(output_dir)
-
-        if self.verbose:
-            print(f"\nReport generated at: {output_dir}")
 
     def update_report_after_drift(
         self,
@@ -539,6 +568,8 @@ class QualityReporter(BaseReporter):
         scores = []
         try:
             unique_blocks = sorted(real_df[block_column].unique(), key=str)
+            # Build metadata once — all blocks share the same schema
+            md_dict = self._build_sdmetrics_metadata(real_df)
 
             for block_id in unique_blocks:
                 real_block = real_df[real_df[block_column] == block_id]
@@ -548,7 +579,6 @@ class QualityReporter(BaseReporter):
                     continue
 
                 try:
-                    md_dict = self._build_sdmetrics_metadata(real_block)
 
                     report = QualityReport()
                     report.generate(

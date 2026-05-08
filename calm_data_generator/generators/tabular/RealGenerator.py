@@ -1376,6 +1376,10 @@ class RealGenerator(BaseGenerator):
         # Resize each independently so both calls always get the right length.
         if cond is not None:
             cond_arr = np.asarray(cond)
+            if len(cond_arr) != len(data):
+                self.logger.warning(
+                    f"cond length {len(cond_arr)} != data length {len(data)}; np.resize will wrap/truncate."
+                )
             cond_fit = pd.Series(np.resize(cond_arr, len(data)))
             cond_gen = pd.Series(np.resize(cond_arr, n_samples))
         else:
