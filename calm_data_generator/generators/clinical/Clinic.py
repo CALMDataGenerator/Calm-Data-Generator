@@ -1,24 +1,21 @@
+import io
+import logging
+import os
+import re
+from typing import Any, Dict, List, Optional, Union
+
 import numpy as np
 import pandas as pd
 from scipy import stats
-import os
-import io
-from typing import List, Dict, Optional, Any
+
+from calm_data_generator.generators.clinical.ClinicReporter import ClinicReporter
+from calm_data_generator.generators.complex.ComplexGenerator import ComplexGenerator
+from calm_data_generator.generators.configs import DateConfig, DriftConfig
 from calm_data_generator.generators.drift.DriftInjector import DriftInjector
 from calm_data_generator.generators.dynamics.ScenarioInjector import ScenarioInjector
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
-# import tensorflow as tf
-
-
-# tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
-
-# tf.get_logger().setLevel("ERROR")
-
-
-from calm_data_generator.generators.clinical.ClinicReporter import ClinicReporter
-from calm_data_generator.generators.configs import DateConfig, DriftConfig
-from calm_data_generator.generators.complex.ComplexGenerator import ComplexGenerator
+logger = logging.getLogger(__name__)
 
 
 class ClinicalDataGenerator(ComplexGenerator):
@@ -111,6 +108,26 @@ class ClinicalDataGenerator(ComplexGenerator):
         )
 
         res = {"demographics": demo_df, "genes": genes_df, "proteins": proteins_df}
+
+        # Generate target variable Y if config provided
+        target_config = kwargs.get("target_variable_config")
+        if target_config:
+            omics_dfs = [df for df in [genes_df, proteins_df] if df is not None and not df.empty]
+            try:
+                Y = self.generate_target_variable(
+                    demographic_df=demo_df,
+                    omics_dfs=omics_dfs if omics_dfs else demo_df,
+                    weights=target_config.get("weights", {}),
+                    noise_std=target_config.get("noise_std", 0.1),
+                    binary_threshold=target_config.get("binary_threshold"),
+                )
+                y_name = target_config.get("name", "Y")
+                Y.name = y_name
+                demo_df[y_name] = Y
+                res["demographics"] = demo_df
+                logger.info("Target variable '%s' generated and added to demographics.", y_name)
+            except Exception as e:
+                logger.error("Failed to generate target variable: %s", e)
 
         if save_dataset and output_dir:
             os.makedirs(output_dir, exist_ok=True)
@@ -455,12 +472,18 @@ class ClinicalDataGenerator(ComplexGenerator):
         mask = pd.Series(True, index=df.index)
         for c in constraints:
             col, op, val = c.get("col"), c.get("op"), c.get("val")
-            if col not in df.columns: continue
-            if op == ">=": mask &= df[col] >= val
-            elif op == "<=": mask &= df[col] <= val
-            elif op == "==": mask &= df[col] == val
-            elif op == ">": mask &= df[col] > val
-            elif op == "<": mask &= df[col] < val
+            if col not in df.columns:
+                continue
+            if op == ">=":
+                mask &= df[col] >= val
+            elif op == "<=":
+                mask &= df[col] <= val
+            elif op == "==":
+                mask &= df[col] == val
+            elif op == ">":
+                mask &= df[col] > val
+            elif op == "<":
+                mask &= df[col] < val
         return df[mask].copy()
 
     def _prepare_demographic_context(
@@ -892,10 +915,10 @@ class ClinicalDataGenerator(ComplexGenerator):
     def generate_target_variable(
         self,
         demographic_df: pd.DataFrame,
-        omics_dfs: list[pd.DataFrame] | pd.DataFrame,
+        omics_dfs: Union[List[pd.DataFrame], pd.DataFrame],
         weights: dict,
         noise_std: float = 0.1,
-        binary_threshold: float = None,
+        binary_threshold: Optional[Union[float, str]] = None,
     ) -> pd.Series:
         """
         Generates a target variable Y as a linear combination of demographic and omics features.
@@ -905,8 +928,11 @@ class ClinicalDataGenerator(ComplexGenerator):
             omics_dfs (list[pd.DataFrame] | pd.DataFrame): One or more omics dataframes.
             weights (dict): Dictionary mapping column names (or regex patterns) to coefficients.
                             Example: {'Age': 0.3, 'Sex': 0.1, 'G_.*': 0.01}
+                            When a pattern matches multiple columns, weight is applied to their mean.
             noise_std (float): Standard deviation of the Gaussian noise added to Y.
-            binary_threshold (float, optional): If provided, Y is binarized based on this threshold.
+            binary_threshold (float | 'median' | None): If float, binarizes Y at that value.
+                            If 'median', binarizes at the median (guarantees 50/50 balance).
+                            If None, returns continuous Y.
 
         Returns:
             pd.Series: The generated target variable Y.
@@ -914,64 +940,57 @@ class ClinicalDataGenerator(ComplexGenerator):
         if isinstance(omics_dfs, pd.DataFrame):
             omics_dfs = [omics_dfs]
 
-        # Concatenate all dataframes to form the feature matrix
-        # Ensure indices align
         full_df = demographic_df.copy()
         for df in omics_dfs:
             if not df.index.equals(full_df.index):
-                raise ValueError("Indices of demographic_df and omics_dfs must match.")
+                # Index names may differ (e.g. "Patient_ID" vs None) while values match
+                if not (df.index == full_df.index).all():
+                    raise ValueError(
+                        f"Indices of demographic_df and omics_dfs must match. "
+                        f"demographic_df index sample: {full_df.index[:3].tolist()}, "
+                        f"omics index sample: {df.index[:3].tolist()}"
+                    )
+                df = df.copy()
+                df.index = full_df.index
             full_df = pd.concat([full_df, df], axis=1)
 
-        # Handle categorical variables in demographic_df (e.g., Sex)
-        # We assume they are already encoded or we need to encode them.
-        # For 'Sex', if it's 'Male'/'Female', we map to 1/0.
         if "Sex" in full_df.columns and full_df["Sex"].dtype == "object":
             full_df["Sex"] = full_df["Sex"].map({"Male": 1, "Female": 0})
 
         n_samples = len(full_df)
         Y = np.zeros(n_samples)
 
-        import re
-
         for pattern, weight in weights.items():
-            # Find matching columns
             regex = re.compile(pattern)
             matched_cols = [col for col in full_df.columns if regex.match(col)]
 
             if not matched_cols:
-                print(f"Warning: No columns matched pattern '{pattern}'")
+                logger.warning("No columns matched pattern '%s'. Available columns sample: %s",
+                               pattern, list(full_df.columns[:10]))
                 continue
 
-            # Apply weights
-            # If multiple columns match, we assume the weight applies to EACH of them
-            # OR we could assume the weight applies to the SUM/MEAN of them?
-            # Standard interpretation: Y += weight * X_i for each X_i matching pattern.
+            numeric_cols = [c for c in matched_cols if pd.api.types.is_numeric_dtype(full_df[c])]
+            non_numeric = set(matched_cols) - set(numeric_cols)
+            if non_numeric:
+                logger.warning("Skipping non-numeric columns matching '%s': %s", pattern, non_numeric)
 
-            for col in matched_cols:
-                if pd.api.types.is_numeric_dtype(full_df[col]):
-                    # Standardize feature before applying weight?
-                    # Usually linear combination assumes raw or pre-processed.
-                    # We'll use raw values but maybe we should normalize?
-                    # Given the user prompt "Combinación lineal de: genes de grupo A (correlación 0.2)..."
-                    # It likely implies standardized effect sizes or raw coefficients.
-                    # Let's assume raw coefficients on standardized data is safer for mixing scales (Age vs Gene Expr).
+            if not numeric_cols:
+                continue
 
-                    col_data = full_df[col]
-                    if col_data.std() > 0:
-                        col_data_std = (col_data - col_data.mean()) / col_data.std()
-                    else:
-                        col_data_std = col_data - col_data.mean()
+            # Apply weight to the mean of matched columns (avoids inflating contribution
+            # when pattern matches many columns, e.g. 'G_.*' matching 1000 genes)
+            group_data = full_df[numeric_cols].mean(axis=1)
+            std = group_data.std()
+            group_std = (group_data - group_data.mean()) / std if std > 0 else group_data - group_data.mean()
+            Y += weight * group_std
 
-                    Y += weight * col_data_std
-                else:
-                    print(f"Warning: Column '{col}' is not numeric. Skipping.")
-
-        # Add noise
         Y += np.random.normal(0, noise_std, n_samples)
 
         Y_series = pd.Series(Y, index=full_df.index, name="Target_Y")
 
-        if binary_threshold is not None:
+        if binary_threshold == "median":
+            Y_series = (Y_series > Y_series.median()).astype(int)
+        elif binary_threshold is not None:
             Y_series = (Y_series > binary_threshold).astype(int)
 
         return Y_series
