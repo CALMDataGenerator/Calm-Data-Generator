@@ -6,8 +6,9 @@ This tutorial demonstrates how to evolve features over time and
 construct target variables based on custom formulas.
 """
 
-import pandas as pd
 import numpy as np
+import pandas as pd
+
 from calm_data_generator.generators.dynamics import ScenarioInjector
 
 # ============================================================
@@ -42,11 +43,11 @@ injector = ScenarioInjector(seed=42)
 evolution_config = {
     "temperature": {
         "type": "trend",
-        "rate": 0.05,  # 5% increase per step
+        "slope": 0.05,  # 0.05 units increase per step
         "noise_std": 0.5,  # Add some noise
     },
     "humidity": {
-        "type": "cyclic",
+        "type": "cycle",
         "period": 30,  # 30-day cycle
         "amplitude": 5,  # ±5 units
     },
@@ -100,7 +101,7 @@ data_with_binary = injector.construct_target(
 
 print("\n--- Classification Target ---")
 print(data_with_binary[["temperature", "wind_speed", "is_hot"]].head(10))
-print(f"\nClass distribution:")
+print("\nClass distribution:")
 print(data_with_binary["is_hot"].value_counts())
 
 # ============================================================

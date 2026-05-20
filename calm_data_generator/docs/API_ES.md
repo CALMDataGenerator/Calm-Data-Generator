@@ -27,7 +27,7 @@ from calm_data_generator.generators.tabular import RealGenerator, QualityReporte
 | `fflows` | FourierFlows (series periódicas) |
 | `scvi` | scVI (Single-Cell VI) |
 
-**Nuevos Parámetros (v1.2.0+):**
+**Parámetros destacados:**
 - `differentiation_factor` (float): Aumenta la separación de clases en el espacio latente (solo TVAE/scVI).
 - `clipping_mode` (str): `'strict'`, `'permissive'`, o `'none'` para manejar los rangos de salida.
 - `use_latent_sampling` (bool): Para scVI, muestrea desde el espacio latente de datos reales.
@@ -116,10 +116,10 @@ from calm_data_generator.generators.drift import DriftInjector
 
 ```python
 from calm_data_generator.generators.dynamics import ScenarioInjector
-from calm_data_generator.generators.dynamics.CausalEngine import CausalEngine
+from calm_data_generator.generators.dynamics import CausalEngine
 ```
 
-**ScenarioInjector** — evoluciona features en el tiempo. Tipos de evolución: `linear`, `exponential_growth`, `decay`, `seasonal`, `step`, `noise`, `random_walk`, `driven_by` (Pilar 5).
+**ScenarioInjector** — evoluciona features en el tiempo. Tipos de evolución: `linear` (`trend`), `exponential_growth`, `exponential_decay` (`decay`), `cycle` (`sinusoidal`, `seasonal`), `sigmoid`, `step`, `noise`, `random_walk`, `driven_by`.
 
 **CausalEngine** — propagación causal basada en DAG. Define relaciones padre→hijo con funciones de transferencia y propaga perturbaciones por el grafo. Ver [CAUSAL_ENGINE_REFERENCE_ES.md](CAUSAL_ENGINE_REFERENCE_ES.md).
 
@@ -148,10 +148,7 @@ reporter.generate_comprehensive_report(..., privacy_check=True)
 ari_scores = reporter.calculate_ari(real_df, synthetic_df, target_col="label")
 ```
 
-O usar transformaciones manuales para protección:
-- `pseudonymize_columns`
-- `add_laplace_noise`
-- `shuffle_columns`
+Para garantías de privacidad diferencial en la generación, usa los métodos `dpgan` o `pategan` via `RealGenerator.generate(method="dpgan", ...)` o `RealGenerator.generate(method="pategan", ...)`.
 
 ## Instalación
 

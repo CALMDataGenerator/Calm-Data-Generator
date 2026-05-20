@@ -26,7 +26,7 @@ from calm_data_generator.generators.tabular import RealGenerator, QualityReporte
 | `scvi` | scVI (Single-Cell VI) |
 | `ddpm` | Tabular Diffusion (DDPM) |
 
-**New Parameters (v1.2.0+):**
+**Notable Parameters:**
 - `differentiation_factor` (float): Enhances class separation in latent space (TVAE/scVI only).
 - `clipping_mode` (str): `'strict'`, `'permissive'`, or `'none'` for handling output ranges.
 - `use_latent_sampling` (bool): For scVI, sample from real data latent space.
@@ -112,7 +112,7 @@ from calm_data_generator.generators.drift import DriftInjector
 
 ```python
 from calm_data_generator.generators.dynamics import ScenarioInjector
-from calm_data_generator.generators.dynamics.CausalEngine import CausalEngine
+from calm_data_generator.generators.dynamics import CausalEngine
 ```
 
 **ScenarioInjector** — evolves features over time. Evolution types: `linear`, `exponential_growth`, `decay`, `seasonal`, `step`, `noise`, `random_walk`, `driven_by` (Pilar 5).
@@ -132,19 +132,6 @@ from calm_data_generator.generators.utils.propagation import propagate_numeric_d
 
 ---
 
-### generators.dynamics - Scenario Evolution
-
-```python
-from calm_data_generator.generators.dynamics import ScenarioInjector
-```
-
-**Methods:**
-- `evolve_features()` - Apply trends/cycles
-- `construct_target()` - Create target variables
-- `project_to_future_period()` - Future data
-
----
-
 ### privacy - Privacy Transformations (Integrated)
 
 Privacy features are integrated into the `QualityReporter`. You can assess quality and privacy using:
@@ -157,10 +144,7 @@ reporter.generate_comprehensive_report(..., privacy_check=True)
 ari_scores = reporter.calculate_ari(real_df, synthetic_df, target_col="label")
 ```
 
-Or use standalone transformations for manual protection:
-- `pseudonymize_columns`
-- `add_laplace_noise`
-- `shuffle_columns`
+For differential privacy guarantees at generation time, use the `dpgan` or `pategan` synthesis methods via `RealGenerator.generate(method="dpgan", ...)` or `RealGenerator.generate(method="pategan", ...)`.
 
 ---
 

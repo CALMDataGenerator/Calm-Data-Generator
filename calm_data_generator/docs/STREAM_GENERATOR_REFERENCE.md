@@ -47,7 +47,8 @@ Main method to generate a synthetic dataset.
     - `date_config` (DateConfig): Configuration object for date injection.
     - `drift_type` (str): Type of drift to inject ('none', 'virtual_drift', 'gradual', 'abrupt', 'incremental').
     - `drift_options` (dict): Options for drift injection (e.g. `missing_fraction` for virtual drift).
-    - `drift_config` (list): List of configurations for using `DriftInjector` post-generation.
+    - `drift_config` (list): List of `DriftConfig` objects for `DriftInjector` post-generation.
+    - `report_config` (ReportConfig): Configuration for report generation.
     - `dynamics_config` (dict): Configuration for `ScenarioInjector` (e.g. feature evolution, target construction).
     - `save_dataset` (bool): Whether to save the CSV file (default: False).
 

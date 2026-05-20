@@ -55,7 +55,7 @@ Método principal para generar un dataset sintético.
     - `date_config` (DateConfig): Objeto de configuración para inyección de fechas.
     - `drift_type` (str): Tipo de drift a inyectar ('none', 'virtual_drift', 'gradual', 'abrupt', 'incremental').
     - `drift_options` (dict): Opciones para inyección de drift (ej. `missing_fraction` para virtual drift).
-    - `drift_config` (List[DriftConfig]): Lista de objetos `DriftConfig` para inyección de drift post-generación.
+    - `drift_config` (List[DriftConfig]): Lista de objetos `DriftConfig` para inyección de drift post-generación con `DriftInjector`.
     - `report_config` (ReportConfig): Configuración para la generación de informes.
     - `dynamics_config` (dict): Configuración para `ScenarioInjector` (ej. evolución de features, construcción de targets).
     - `save_dataset` (bool): Si se debe guardar el archivo CSV (defecto: False).

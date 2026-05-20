@@ -13,7 +13,7 @@
 **CALM-Data-Generator** is a comprehensive Python library for synthetic data generation with advanced features for:
 - **Clinical/Medical Data** - Generate realistic patient demographics, genes, proteins
 - **Tabular Data Synthesis** - CTGAN, TVAE, CART, and more
-- **Time Series** - TimeGAN, DGAN
+- **Time Series** - TimeGAN, TimeVAE, FourierFlows
 - **Single-Cell** - scVI, GEARS (Perturbation Prediction)
 - **Latent Differentiation** - Force class separability in TVAE & scVI
 - **Flexible Clipping** - Strict or permissive data range enforcement

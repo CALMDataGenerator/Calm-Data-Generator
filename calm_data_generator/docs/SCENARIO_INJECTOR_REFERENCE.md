@@ -17,7 +17,7 @@ from calm_data_generator.generators.configs import ScenarioConfig, EvolutionFeat
 scenario_conf = ScenarioConfig(
     evolve_features={
         "revenue": EvolutionFeatureConfig(type="trend", slope=100.0),
-        "interest": EvolutionFeatureConfig(type="decay", rate=0.01)
+        "interest": EvolutionFeatureConfig(type="exponential_decay", rate=0.01)
     },
     # 2. Construct target based on evolved features
     construct_target={
@@ -34,7 +34,7 @@ scenario_conf = ScenarioConfig(
 # Via Direct Injection:
 from calm_data_generator.generators.dynamics import ScenarioInjector
 injector = ScenarioInjector()
-df_evolved = injector.apply_config(df, scenario_conf)
+df_evolved = injector.evolve_features(df, scenario_config=scenario_conf)
 ```
 
 ---
@@ -44,9 +44,9 @@ df_evolved = injector.apply_config(df, scenario_conf)
 ```text
 What do you want to do?
 ├─ Make values change over time (Growth, Seasonality)?
-│  └─ → inject_feature_evolution() (or ScenarioConfig.evolve_features)
+│  └─ → evolve_features() (pass evolution_config or scenario_config)
 ├─ Create a Target variable from Features?
-│  └─ → construct_target_from_features() (or ScenarioConfig.construct_target)
+│  └─ → construct_target()
 ├─ Project historical data into the future?
 │  └─ → project_to_future_period()
 └─ Change distribution properties (Mean shift, Noise)?
@@ -57,15 +57,17 @@ What do you want to do?
 
 ## 📚 Evolution Types (`type`)
 
-| Type | Pattern | Use Case | Formula |
-|------|---------|----------|---------|
-| `trend` / `linear` | Steady change | Sales growth, inflation | `y = x + slope * t` |
-| `exponential_growth` | Accelerating increase | Viral growth | `y = x * (1 + rate)^t` |
-| `decay` | Decreasing values | Retention loss, radioactivity | `y = x * (1 - rate)^t` |
-| `seasonal` | Cyclical pattern | Holidays, weather, daily cycles | `y = x + A * sin(2πt/P)` |
-| `step` | Sudden jump | Policy change, price hike | `y = x + value if t > step` |
-| `noise` | Random fluctuation | Sensor error, market noise | `y = x + N(0, scale)` |
-| `driven_by` | Inter-variable dependency | IoT sensor coupling, causal scenarios | `delta = f(driver_col_value)` |
+| Type | Aliases | Pattern | Use Case | Formula |
+|------|---------|---------|----------|---------|
+| `trend` | `linear` | Steady change | Sales growth, inflation | `y = x + slope * t` |
+| `exponential_growth` | — | Accelerating increase | Viral growth | `y = x * (1 + rate)^t` |
+| `exponential_decay` | `decay` | Decreasing values | Retention loss, radioactivity | `y = x * (1 - rate)^t` |
+| `cycle` | `sinusoidal`, `seasonal`, `cyclic` | Cyclical pattern | Holidays, weather, daily cycles | `y = x + A * sin(2πt/P)` |
+| `sigmoid` | — | S-curve transition | Gradual phase change, adoption | `y = x + A * σ(t)` |
+| `step` | — | Sudden jump | Policy change, price hike | `y = x + value if t > step` |
+| `noise` | — | Random fluctuation | Sensor error, market noise | `y = x + N(0, scale)` |
+| `random_walk` | — | Cumulative random steps | Brownian motion, stock prices | `y = x + cumsum(N(0, step_std))` |
+| `driven_by` | — | Inter-variable dependency | IoT sensor coupling, causal scenarios | `delta = f(driver_col_value)` |
 
 ### `driven_by` — Evolution driven by another column
 

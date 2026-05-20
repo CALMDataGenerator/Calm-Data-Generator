@@ -1,4 +1,5 @@
 import numpy as np
+
 from calm_data_generator.generators.clinical.Clinic import ClinicalDataGenerator
 from calm_data_generator.generators.configs import DriftConfig
 
@@ -128,7 +129,7 @@ def run_tutorial():
     output_dir = "tutorial_output"
 
     datasets = generator.generate(
-        n_patients=n_samples,
+        n_samples=n_samples,
         n_genes=sum(gene_group_sizes),
         n_proteins=0,  # Skip proteins for this tutorial
         # Demographics Config

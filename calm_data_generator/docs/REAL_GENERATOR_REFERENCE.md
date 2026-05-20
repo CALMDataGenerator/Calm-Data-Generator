@@ -49,13 +49,13 @@ synthetic_df = gen.generate(
     data=df,                          # Original DataFrame (required)
     n_samples=1000,                   # Number of samples to generate (required)
     method="ctgan",                   # Synthesis method
-    
+
     # Configuration Objects
     report_config=ReportConfig(       # Reporting configuration
         output_dir="./output",
         target_column="target"
     ),
-    
+
     # Drift Injection
     drift_injection_config=[
         DriftConfig(
@@ -63,10 +63,10 @@ synthetic_df = gen.generate(
             params={"feature_cols": ["age"], "drift_magnitude": 0.5}
         )
     ],
-    
+
     # Legacy arguments are still supported but Config objects are recommended
-    # target_col="target", 
-    # output_dir="./output" 
+    # target_col="target",
+    # output_dir="./output"
 )
 ```
 
@@ -438,8 +438,6 @@ model_params={"diffusion_steps": 100}
 |--------|-------------|----------------|
 | `dpgan` | Differentially Private GAN | `epsilon`, `delta`, `epochs` |
 | `pategan` | PATE-GAN | `epsilon`, `delta`, `teacher_iters`, `student_iters` |
-| `dp` | Differential Privacy (legacy) | `epsilon`, `delta` |
-| `datasynth` | DataSynthesizer | `k` |
 
 ### Single-Cell / High-Dimensional
 
@@ -517,7 +515,7 @@ synthetic = gen.generate(
     data=adata,              # Pass AnnData directly
     n_samples=1000,
     method="scvi",
-    target_col="cell_type", 
+    target_col="cell_type",
     epochs=200,
     n_latent=30,
     n_layers=1,
@@ -590,7 +588,7 @@ synthetic_df = gen.generate(
 
 # 2. Convert back to AnnData for scanpy analysis
 synthetic_adata = RealGenerator.to_anndata(
-    synthetic_df, 
+    synthetic_df,
     target_col="cell_type"
 )
 
@@ -911,7 +909,7 @@ If you have a `target` column (e.g., price, churn) and the relationship $X \righ
 *   Always specify `target_col="column_name"`.
     ```python
     # The generator automatically detects if it's Regression or Classification
-    gen.generate(data, target_col="price", method="lgbm") 
+    gen.generate(data, target_col="price", method="lgbm")
     ```
 
 ### 3. Clustering (Unsupervised)
@@ -931,7 +929,7 @@ If your data is logically fragmented (e.g., by Stores, Countries, Patients) and 
 *   Use **`RealBlockGenerator`** instead of `RealGenerator`.
     ```python
     block_gen = RealBlockGenerator()
-    block_gen.generate(data, block_column="StoreID", method="cart") 
+    block_gen.generate(data, block_column="StoreID", method="cart")
     ```
     *This trains a different model for each StoreID.*
 
@@ -951,8 +949,8 @@ If your target column has minority classes that you want to amplify:
 
 ### `ddpm` - Synthcity TabDDPM (Advanced Tabular Diffusion)
 
-**Type:** Deep Learning (Diffusion Model)  
-**Best For:** High-quality tabular synthesis, production environments, large datasets  
+**Type:** Deep Learning (Diffusion Model)
+**Best For:** High-quality tabular synthesis, production environments, large datasets
 **Requirements:** `synthcity` (included in base installation)
 
 #### Description
@@ -982,17 +980,17 @@ synth = gen.generate(
     data,
     method='ddpm',
     n_samples=1000,
-    
+
     # Training parameters
     n_iter=1000,                    # Training epochs (default: 1000)
     lr=0.002,                       # Learning rate (default: 0.002)
     batch_size=1024,                # Batch size (default: 1024)
-    
+
     # Diffusion parameters
     num_timesteps=1000,             # Diffusion timesteps (default: 1000)
     scheduler='cosine',             # 'cosine' or 'linear' (default: 'cosine')
     gaussian_loss_type='mse',       # 'mse' or 'kl' (default: 'mse')
-    
+
     # Model architecture
     model_type='mlp',               # 'mlp', 'resnet', or 'tabnet' (default: 'mlp')
     model_params={                  # Architecture-specific parameters
@@ -1000,7 +998,7 @@ synth = gen.generate(
         'n_units_hidden': 256,
         'dropout': 0.0
     },
-    
+
     # Task type
     is_classification=False,        # True for classification tasks
 )
@@ -1098,8 +1096,8 @@ synth = gen.generate(
 
 ### `timegan` - TimeGAN (Time Series GAN)
 
-**Type:** Deep Learning (GAN for Time Series)  
-**Best For:** Complex temporal patterns, multi-entity time series  
+**Type:** Deep Learning (GAN for Time Series)
+**Best For:** Complex temporal patterns, multi-entity time series
 **Requirements:** `synthcity` (included in base installation)
 
 #### Description
@@ -1135,7 +1133,7 @@ synth = gen.generate(
     data,
     method='timegan',
     n_samples=100,  # Number of sequences to generate
-    
+
     # Training parameters
     n_iter=1000,                    # Training epochs (default: 1000)
     n_units_hidden=100,             # Hidden units in RNN (default: 100)
@@ -1190,8 +1188,8 @@ synth = gen.generate(
 
 ### `timevae` - TimeVAE (Time Series VAE)
 
-**Type:** Deep Learning (VAE for Time Series)  
-**Best For:** Regular time series, faster training than TimeGAN  
+**Type:** Deep Learning (VAE for Time Series)
+**Best For:** Regular time series, faster training than TimeGAN
 **Requirements:** `synthcity` (included in base installation)
 
 #### Description
@@ -1227,7 +1225,7 @@ synth = gen.generate(
     data,
     method='timevae',
     n_samples=100,  # Number of sequences to generate
-    
+
     # Training parameters
     n_iter=1000,                    # Training epochs (default: 1000)
     decoder_n_layers_hidden=2,      # Decoder layers (default: 2)
@@ -1292,8 +1290,8 @@ synth = gen.generate(
 
 ### `fflows` - FourierFlows (Frequency-Domain Normalizing Flows for Time Series)
 
-**Type:** Deep Learning (Normalizing Flows for Time Series)  
-**Best For:** Periodic/quasi-periodic time series, stable alternative to TimeGAN  
+**Type:** Deep Learning (Normalizing Flows for Time Series)
+**Best For:** Periodic/quasi-periodic time series, stable alternative to TimeGAN
 **Requirements:** `synthcity`
 
 #### Description
@@ -1328,8 +1326,8 @@ synth = gen.generate(
 
 ### `bn` - Bayesian Network
 
-**Type:** Probabilistic Graphical Model  
-**Best For:** Clinical/structured tabular data with causal dependencies between variables  
+**Type:** Probabilistic Graphical Model
+**Best For:** Clinical/structured tabular data with causal dependencies between variables
 **Requirements:** `synthcity`
 
 #### Description

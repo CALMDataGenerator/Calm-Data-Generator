@@ -17,7 +17,7 @@ from calm_data_generator.generators.configs import ScenarioConfig, EvolutionFeat
 scenario_conf = ScenarioConfig(
     evolve_features={
         "revenue": EvolutionFeatureConfig(type="trend", slope=100.0),
-        "interest": EvolutionFeatureConfig(type="decay", rate=0.01)
+        "interest": EvolutionFeatureConfig(type="exponential_decay", rate=0.01)
     },
     # 2. Construir target basado en features evolucionadas
     construct_target={
@@ -34,7 +34,7 @@ scenario_conf = ScenarioConfig(
 # Vía Inyección Directa:
 from calm_data_generator.generators.dynamics import ScenarioInjector
 injector = ScenarioInjector()
-df_evolved = injector.apply_config(df, scenario_conf)
+df_evolved = injector.evolve_features(df, scenario_config=scenario_conf)
 ```
 
 ---
@@ -44,12 +44,12 @@ df_evolved = injector.apply_config(df, scenario_conf)
 ```text
 ¿Qué quieres hacer?
 ├─ ¿Hacer que valores cambien en el tiempo (Crecimiento, Estacionalidad)?
-│  └─ → inject_feature_evolution() (o ScenarioConfig.evolve_features)
+│  └─ → evolve_features() (pasa evolution_config o scenario_config)
 ├─ ¿Crear una variable Target a partir de Features?
-│  └─ → construct_target_from_features() (o ScenarioConfig.construct_target)
+│  └─ → construct_target()
 ├─ ¿Proyectar datos históricos al futuro?
 │  └─ → project_to_future_period()
-└─ ¿Cambiar propiedades de distribución (Promedio, Ruido)?
+└─ ¿Cambiar propiedades de distribución (Media, Ruido)?
    └─ → Usa DriftInjector en su lugar.
 ```
 
@@ -57,17 +57,17 @@ df_evolved = injector.apply_config(df, scenario_conf)
 
 ## 📚 Tipos de Evolución (`type`)
 
-| Tipo | Patrón | Caso de Uso | Fórmula |
-|------|--------|-------------|---------|
-| `trend` / `linear` | Cambio constante | Ventas, inflación | `y = x + pendiente * t` |
-| `exponential_growth` | Incremento acelerado | Crecimiento viral | `y = x * (1 + tasa)^t` |
-| `decay` | Valores decrecientes | Pérdida de retención | `y = x * (1 - tasa)^t` |
-| `seasonal` / `cycle` | Patrón cíclico | Vacaciones, clima | `y = x + A * sin(2πt/P)` |
-| `step` | Salto repentino | Cambio política, precio | `y = x + valor si t > paso` |
-| `noise` | Fluctuación aleatoria | Error sensor, ruido mercado | `y = x + N(0, escala)` |
-| `random_walk` | Paseo aleatorio | Precios de acciones | `y = x + Σ N(0, paso_std)` |
-| `sigmoid` | Curva en S | Adopción tecnológica | `y = x + A / (1 + e^{-(t-c)/w})` |
-| `driven_by` | Dependencia inter-variable | Sensor IoT acoplado, escenarios causales | `delta = f(valor_driver_col)` |
+| Tipo | Alias | Patrón | Caso de Uso | Fórmula |
+|------|-------|--------|-------------|---------|
+| `trend` | `linear` | Cambio constante | Ventas, inflación | `y = x + slope * t` |
+| `exponential_growth` | — | Incremento acelerado | Crecimiento viral | `y = x * (1 + rate)^t` |
+| `exponential_decay` | `decay` | Valores decrecientes | Pérdida de retención | `y = x * (1 - rate)^t` |
+| `cycle` | `sinusoidal`, `seasonal`, `cyclic` | Patrón cíclico | Vacaciones, clima | `y = x + A * sin(2πt/P)` |
+| `sigmoid` | — | Curva en S | Adopción tecnológica | `y = x + A * σ(t)` |
+| `step` | — | Salto repentino | Cambio de política, precio | `y = x + valor si t > paso` |
+| `noise` | — | Fluctuación aleatoria | Error de sensor, ruido de mercado | `y = x + N(0, escala)` |
+| `random_walk` | — | Paseo aleatorio acumulativo | Movimiento browniano, precios | `y = x + cumsum(N(0, step_std))` |
+| `driven_by` | — | Dependencia inter-variable | Sensor IoT acoplado, escenarios causales | `delta = f(valor_driver_col)` |
 
 ### `driven_by` — Evolución impulsada por otra columna
 

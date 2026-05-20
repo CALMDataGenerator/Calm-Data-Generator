@@ -45,7 +45,7 @@ Cada método de síntesis está respaldado por una o más librerías de código 
 | **ClinicalDataGenerator** | NumPy, Pandas, SciPy (`stats`, `linalg`) — vía ComplexGenerator |
 | **ComplexGenerator** | SciPy (`linalg.eigh`, `stats`), NumPy — motores de Cópula Gaussiana |
 | **StreamGenerator** | NumPy, Pandas, DriftInjector |
-| **StreamGeneratorFactory** | [River](https://riverml.xyz/) — extra opcional `[stream]` |
+| **GeneratorFactory** | [River](https://riverml.xyz/) — extra opcional `[stream]` |
 | **DriftInjector** | NumPy, Pandas, QualityReporter |
 | **ScenarioInjector** | NumPy, Pandas |
 | **CausalEngine** | NumPy, Pandas |
@@ -227,7 +227,7 @@ Permite modificar datasets existentes para introducir cambios estadísticos cont
 Usa `inject_drift()` para aplicar drift fácilmente a múltiples columnas sin preocuparte por sus tipos de datos.
 
 ```python
-injector.inject_drift(df, columns=['salary'], drift_mode='gradual', magnitude=0.5)
+injector.inject_drift(df, columns=['salary'], drift_mode='gradual', drift_magnitude=0.5)
 ```
 
 Ver [DRIFT_INJECTOR_REFERENCE_ES.md](./DRIFT_INJECTOR_REFERENCE_ES.md).
@@ -277,7 +277,7 @@ Permiten crear datasets compuestos de múltiples partes ("bloques"), donde cada 
 ### Ejemplo: RealBlockGenerator
 
 ```python
-from calm_data_generator.generators.tabular import RealBlockGenerator
+from calm_data_generator.generators.tabular.RealBlockGenerator import RealBlockGenerator
 
 gen = RealBlockGenerator()
 
@@ -450,4 +450,3 @@ synthetic_df = preset.generate(
 ```
 
 Referencia completa de parámetros por preset: [PRESETS_REFERENCE_ES.md](PRESETS_REFERENCE_ES.md)
-

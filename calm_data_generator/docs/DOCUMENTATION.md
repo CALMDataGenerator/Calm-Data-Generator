@@ -54,7 +54,7 @@ pip install calm-data-generator
 | full | `pip install "calm-data-generator[full]"` | All optional dependencies above |
 
 > [!NOTE]
-> **Installation Speed**: In version 1.0.0, we have pinned high-level dependencies (`pydantic`, `xgboost`, `cloudpickle`) to avoid the previous ~40-minute resolution loop caused by `synthcity`'s complex requirements. Installation now takes significantly less time.
+> **Installation Speed**: High-level dependencies (`pydantic`, `xgboost`, `cloudpickle`) are pinned to avoid long resolution loops caused by `synthcity`'s complex requirements. Installation time is significantly reduced compared to installing Synthcity directly.
 
 ### Troubleshooting
 If `river` fails to build on Linux, ensure you have the necessary tools:
@@ -110,7 +110,7 @@ Each synthesis method in CALM-Data-Generator is powered by one or more underlyin
 | **ClinicalDataGenerator** | NumPy, Pandas, SciPy (`stats`, `linalg`) — via ComplexGenerator |
 | **ComplexGenerator** | SciPy (`linalg.eigh`, `stats`), NumPy — Gaussian Copula engines |
 | **StreamGenerator** | NumPy, Pandas, DriftInjector |
-| **StreamGeneratorFactory** | [River](https://riverml.xyz/) — optional `[stream]` extra |
+| **GeneratorFactory** | [River](https://riverml.xyz/) — optional `[stream]` extra |
 | **DriftInjector** | NumPy, Pandas, QualityReporter |
 | **ScenarioInjector** | NumPy, Pandas |
 | **CausalEngine** | NumPy, Pandas |
@@ -132,12 +132,15 @@ Each synthesis method in CALM-Data-Generator is powered by one or more underlyin
 ```
 calm_data_generator/
 ├── generators/
-│   ├── tabular/    → RealGenerator, QualityReporter
-│   ├── clinical/   → ClinicalDataGenerator
-│   ├── stream/     → StreamGenerator
+│   ├── tabular/    → RealGenerator, RealBlockGenerator, QualityReporter
+│   ├── clinical/   → ClinicalDataGenerator, ClinicalDataGeneratorBlock
+│   ├── complex/    → ComplexGenerator (abstract mathematical layer)
+│   ├── stream/     → StreamGenerator, StreamBlockGenerator, StreamReporter
 │   ├── drift/      → DriftInjector
-│   └── dynamics/   → ScenarioInjector
-└── reports/        → Visualization & reporting
+│   ├── dynamics/   → ScenarioInjector, CausalEngine
+│   └── utils/      → propagation utilities
+├── presets/        → 19 ready-to-use generation presets
+└── reports/        → QualityReporter, visualization & reporting
 ```
 
 ---
@@ -188,7 +191,7 @@ synthetic = gen.generate(df, 1000, method='copula')
 ```python
 # CTGAN - Conditional GAN for Tabular Data
 synthetic = gen.generate(
-    df, 1000, 
+    df, 1000,
     method='ctgan',
     epochs=300
 )
@@ -595,11 +598,11 @@ injector = ScenarioInjector(seed=42)
 evolution_config = {
     'temperature': {
         'type': 'trend',
-        'rate': 0.05,
+        'slope': 0.05,
         'noise_std': 0.5
     },
     'humidity': {
-        'type': 'cyclic',
+        'type': 'cycle',
         'period': 30,
         'amplitude': 5
     }
@@ -705,17 +708,17 @@ from calm_data_generator.generators.configs import DateConfig
 config = DateConfig(
     start_date="2024-01-01",
     date_col="timestamp",
-    date_every=1,         # Increment date every N rows
-    date_step={'days': 1} # Amount to increment
+    frequency=1,         # Increment date every N rows
+    step={'days': 1}     # Amount to increment
 )
 ```
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `start_date` | str | req | Initial date (YYYY-MM-DD or datetime string) |
-| `date_col` | str | `"date"` | Name of the date column to create |
-| `date_every` | int | `1` | Number of rows to generate before incrementing the date. Use this to simulate multiple events per day. |
-| `date_step` | dict | `{'days': 1}` | Increment step. Keys match `relativedelta` args (days, hours, minutes). |
+| `start_date` | str | `None` | Initial date (YYYY-MM-DD or datetime string) |
+| `date_col` | str | `"timestamp"` | Name of the date column to create |
+| `frequency` | int | `1` | Number of rows to generate before incrementing the date. Use this to simulate multiple events per day. |
+| `step` | dict | `None` | Increment step. Keys match `timedelta` args (e.g., `{"days": 1}`, `{"hours": 6}`). |
 
 ---
 ## Block Generators
@@ -734,10 +737,10 @@ This approach is superior to global modeling when data has distinct regimes (e.g
 ### Example: SyntheticBlockGenerator (Drift)
 
 ```python
-from calm_data_generator.generators.stream import StreamBlockGenerator
+from calm_data_generator.generators.stream.StreamBlockGenerator import SyntheticBlockGenerator
 from calm_data_generator.generators.configs import DriftConfig
 
-gen = StreamBlockGenerator()
+gen = SyntheticBlockGenerator()
 
 # Define Drift per block (optional)
 drift_block2 = DriftConfig(method="inject_feature_drift", magnitude=0.8)
@@ -928,4 +931,3 @@ synthetic_df = preset.generate(
 ```
 
 Full parameter reference for each preset: [PRESETS_REFERENCE.md](PRESETS_REFERENCE.md)
-

@@ -1,10 +1,5 @@
-import pandas as pd
 import numpy as np
-import sys
-import os
-
-# Add relevant paths to sys.path to ensure modules are found
-sys.path.append("/home/alex/calm_data_generator")
+import pandas as pd
 
 from calm_data_generator.generators.drift.DriftInjector import DriftInjector
 from calm_data_generator.generators.dynamics.ScenarioInjector import ScenarioInjector
@@ -26,15 +21,15 @@ def test_correlation_propagation():
     print("--- Test 1: DriftInjector (Shift X, should shift Y) ---")
     injector = DriftInjector(auto_report=False)
 
-    # Inject shift in X WITHOUT propagation
+    # Inject shift in X WITHOUT propagation (correlations=None)
     df_no_prop = injector.inject_feature_drift(
-        df, ["X"], drift_type="shift", drift_magnitude=1.0, respect_correlations=False
+        df, ["X"], drift_type="shift", drift_magnitude=1.0, correlations=None
     )
     print("Without propagation:")
     print(f"Mean Shift X: {df_no_prop['X'].mean() - df['X'].mean():.4f}")
     print(f"Mean Shift Y: {df_no_prop['Y'].mean() - df['Y'].mean():.4f} (Should be ~0)")
 
-    # Inject shift in X WITH propagation
+    # Inject shift in X WITH propagation (pass the correlation DataFrame)
     # We pass the original correlation to strictly enforce that relationship
     correlations = df.corr()
     df_prop = injector.inject_feature_drift(
@@ -42,7 +37,6 @@ def test_correlation_propagation():
         ["X"],
         drift_type="shift",
         drift_magnitude=1.0,
-        respect_correlations=True,
         correlations=correlations,
     )
     print("\nWith propagation:")
@@ -57,15 +51,15 @@ def test_correlation_propagation():
     print(f"Expected Shift Y: {expected_y:.4f}")
 
     print("\n--- Test 2: ScenarioInjector (Evolve X, should evolve Y) ---")
-    scenario = ScenarioInjector(minimal_report=True)
+    scenario = ScenarioInjector(seed=42)
 
     evolution_config = {
         "X": {"type": "linear", "slope": 0.01}  # X grows over time
     }
 
-    # Without propagation
+    # Without propagation (correlations=None)
     df_scen_no_prop = scenario.evolve_features(
-        df, evolution_config, respect_correlations=False, auto_report=False
+        df, evolution_config, correlations=None
     )
     print("Without propagation:")
     print(f"Change X: {df_scen_no_prop['X'].mean() - df['X'].mean():.4f}")
@@ -73,13 +67,11 @@ def test_correlation_propagation():
         f"Change Y: {df_scen_no_prop['Y'].mean() - df['Y'].mean():.4f} (Should be ~0)"
     )
 
-    # With propagation
+    # With propagation (pass the correlation DataFrame)
     df_scen_prop = scenario.evolve_features(
         df,
         evolution_config,
-        respect_correlations=True,
         correlations=correlations,
-        auto_report=False,
     )
     print("\nWith propagation:")
     delta_x_scen = df_scen_prop["X"].mean() - df["X"].mean()

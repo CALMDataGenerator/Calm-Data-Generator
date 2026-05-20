@@ -7,6 +7,7 @@ stream-based generators (River library compatible).
 """
 
 import numpy as np
+
 from calm_data_generator import StreamGenerator
 from calm_data_generator.generators.configs import DriftConfig, ReportConfig
 
@@ -75,20 +76,19 @@ print("Class distribution:")
 print(synthetic_balanced["target"].value_counts())
 
 # ============================================================
-# 4. Balanced with SMOTE
+# 4. Balanced Generation (Alternative)
 # ============================================================
 
-# Use SMOTE for post-hoc balancing
-synthetic_smote = gen.generate(
+# Generate balanced data using random oversampling of minority class
+synthetic_balanced2 = gen.generate(
     generator_instance=simple_stream(),
     n_samples=100,
     balance=True,
-    use_smote=True,
 )
 
-print("\n--- SMOTE Balanced ---")
+print("\n--- Balanced (random oversampling) ---")
 print("Class distribution:")
-print(synthetic_smote["target"].value_counts())
+print(synthetic_balanced2["target"].value_counts())
 
 # ============================================================
 # 5. Sequence Generation (User Sessions)

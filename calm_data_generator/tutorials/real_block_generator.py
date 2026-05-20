@@ -6,11 +6,13 @@ This tutorial demonstrates how to use RealBlockGenerator to synthetize
 data that is partitioned into blocks (e.g., by time periods, regions, or customer segments).
 """
 
-import pandas as pd
-import numpy as np
-import shutil
 import os
-from calm_data_generator.generators.tabular import RealBlockGenerator
+import shutil
+
+import numpy as np
+import pandas as pd
+
+from calm_data_generator.generators.tabular.RealBlockGenerator import RealBlockGenerator
 
 # Setup output directory
 OUTPUT_DIR = "tutorial_output/06_real_block"
