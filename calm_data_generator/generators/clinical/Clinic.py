@@ -426,7 +426,14 @@ class ClinicalDataGenerator(ComplexGenerator):
             "Sex" in raw_demographic_data.columns
             and "Sex_Binario" in raw_demographic_data.columns
         ):
+            # Preserve Sex's column position: Sex_Binario must land at the same index
+            # so that demographic_gene_correlations matrix rows align correctly.
+            sex_pos = raw_demographic_data.columns.get_loc("Sex")
             raw_demographic_data = raw_demographic_data.drop(columns=["Sex"])
+            cols = list(raw_demographic_data.columns)
+            cols.remove("Sex_Binario")
+            cols.insert(sex_pos, "Sex_Binario")
+            raw_demographic_data = raw_demographic_data[cols]
 
         # Clean up final demographic df
         df_temp = df_temp.drop(columns=["Binary_Group", "Propensity"])
@@ -578,14 +585,14 @@ class ClinicalDataGenerator(ComplexGenerator):
         raw_demographic_data: pd.DataFrame = None,
         gene_correlations: np.ndarray = None,
         demographic_gene_correlations: np.ndarray = None,
-        disease_effects_config: dict = None,  # New parameter
-        subgroup_col: str = None,  # New parameter for subgroup-based effects
-        gene_mean_log_center: float = np.log(80),  # For RNA-Seq
-        gene_mean_loc_center: float = 7.0,  # For Microarray
+        disease_effects_config: dict = None,
+        subgroup_col: str = None,
+        gene_mean_log_center: float = np.log(80),
+        gene_mean_loc_center: float = 7.0,
         control_disease_ratio: float = 0.5,
         custom_gene_parameters: dict = None,
         n_samples: int = 100,
-        random_state: int = 42,  # Added for completeness/drift
+        random_state: int = 42,
         drift_injection_config: Optional[List[Dict]] = None,
         dynamics_config: Optional[Dict] = None,
     ):
@@ -956,6 +963,9 @@ class ClinicalDataGenerator(ComplexGenerator):
 
         if "Sex" in full_df.columns and full_df["Sex"].dtype == "object":
             full_df["Sex"] = full_df["Sex"].map({"Male": 1, "Female": 0})
+        # Backward compat: expose numeric Sex as Sex_Binario if callers use that key in weights
+        if "Sex_Binario" not in full_df.columns and "Sex" in full_df.columns:
+            full_df["Sex_Binario"] = full_df["Sex"]
 
         n_samples = len(full_df)
         Y = np.zeros(n_samples)

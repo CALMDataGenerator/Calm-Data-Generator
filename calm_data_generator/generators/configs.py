@@ -143,7 +143,7 @@ class ReportConfig(BaseModel):
     block_column: Optional[str] = None
     resample_rule: Optional[Union[str, int]] = None
     privacy_check: bool = False
-    adversarial_validation: bool = False
+    discriminator: bool = False
     focus_columns: Optional[List[str]] = None
     constraints_stats: Optional[Dict[str, int]] = None
     sequence_config: Optional[Dict] = None

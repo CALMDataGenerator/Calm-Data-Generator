@@ -121,6 +121,10 @@ class LocalIndexGenerator:
                 "dimensionality": {"file": "dimensionality_plot.html", "label": "PCA Visualization"},
                 "discriminator_metrics": {"file": "discriminator_metrics.html", "label": "Adversarial Validation"},
                 "discriminator_explainability": {"file": "discriminator_explainability.html", "label": "Discriminator Explainability"},
+                "tstr": {"file": "tstr_report.html", "label": "TSTR (ML Utility)"},
+                "spearman_heatmaps": {"file": "spearman_heatmaps.html", "label": "Spearman Correlations"},
+                "qq_plots": {"file": "qq_plots.html", "label": "QQ Plots"},
+                "statistical_tests": {"file": "statistical_tests.html", "label": "Statistical Tests (KS · Levene · MMD)"},
             }
             sc_reports = {
                 "scgft": {"file": "scgft_report.html", "label": "scGFT Evaluation"},

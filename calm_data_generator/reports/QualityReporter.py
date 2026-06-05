@@ -129,7 +129,9 @@ class QualityReporter(BaseReporter):
         constraints_stats: Optional[Dict[str, int]] = None,
         privacy_check: bool = False,
         minimal: Optional[bool] = None,
-        adversarial_validation: bool = False,
+        discriminator: bool = False,
+        tstr: bool = False,
+        spearman: bool = False,
         report_config: Optional[Union[ReportConfig, Dict]] = None,
     ) -> None:
         """
@@ -153,7 +155,7 @@ class QualityReporter(BaseReporter):
                 constraints_stats=constraints_stats,
                 privacy_check=privacy_check,
                 minimal=minimal if minimal is not None else self.minimal,
-                adversarial_validation=adversarial_validation,
+                discriminator=discriminator,
                 auto_report=True,  # implied
             )
 
@@ -176,7 +178,7 @@ class QualityReporter(BaseReporter):
         constraints_stats = report_config.constraints_stats
         privacy_check = report_config.privacy_check
         use_minimal = report_config.minimal
-        adversarial_validation = report_config.adversarial_validation
+        discriminator = report_config.discriminator
         use_scgft = report_config.use_scgft
 
         # Force minimal override if self.minimal is explicitly True?
@@ -213,6 +215,14 @@ class QualityReporter(BaseReporter):
             real_df_for_report = real_df
             synthetic_df_for_report = synthetic_df
 
+        # === TSTR ===
+        tstr_metrics = None
+        if tstr and target_column:
+            tstr_metrics = self._run_tstr(real_df, synthetic_df, target_column, output_dir)
+
+        # === Statistical Tests (MMD, KS, Levene) ===
+        statistical_metrics = self._run_statistical_tests(real_df_for_report, synthetic_df_for_report, output_dir)
+
         # === Quality Assessment ===
         sdmetrics_quality, sequential_quality, privacy_metrics = self._run_quality_assessment(
             real_df, real_df_for_report, synthetic_df, synthetic_df_for_report,
@@ -248,6 +258,8 @@ class QualityReporter(BaseReporter):
             "privacy_metrics": privacy_metrics,
             "constraints_stats": constraints_stats,
             "ari_metrics": self._calculate_ari_metrics(real_df_for_report, synthetic_df_for_report, target_column),
+            "tstr_metrics": tstr_metrics,
+            "statistical_metrics": statistical_metrics,
         }
 
         results_path = os.path.join(output_dir, "report_results.json")
@@ -258,7 +270,7 @@ class QualityReporter(BaseReporter):
         self._run_visualizations(
             real_df_for_report, synthetic_df_for_report,
             output_dir, focus_cols, target_column, drift_config,
-            use_minimal, adversarial_validation,
+            use_minimal, discriminator, spearman,
         )
 
         # === Generate YData Reports ===
@@ -328,7 +340,8 @@ class QualityReporter(BaseReporter):
         target_column: Optional[str],
         drift_config: Optional[Dict[str, Any]],
         use_minimal: bool,
-        adversarial_validation: bool,
+        discriminator: bool,
+        spearman: bool,
     ) -> None:
         """Generates Plotly visualizations: density, PCA, comparison, discriminator."""
         if self.verbose:
@@ -368,7 +381,20 @@ class QualityReporter(BaseReporter):
             drift_config=drift_config,
         )
 
-        if adversarial_validation and not use_minimal:
+        if spearman:
+            Visualizer.generate_spearman_heatmaps(
+                real_df=real_df_for_report,
+                synthetic_df=synthetic_df_for_report,
+                output_dir=output_dir,
+            )
+
+        Visualizer.generate_qq_plots(
+            real_df=real_df_for_report,
+            synthetic_df=synthetic_df_for_report,
+            output_dir=output_dir,
+        )
+
+        if discriminator and not use_minimal:
             try:
                 self.discriminator_reporter.generate_report(
                     real_df=real_df_for_report,
@@ -936,3 +962,351 @@ class QualityReporter(BaseReporter):
 
         except Exception as e:
             logger.error("scGFT evaluation failed: %s", e)
+
+    def _run_statistical_tests(
+        self,
+        real_df: pd.DataFrame,
+        synthetic_df: pd.DataFrame,
+        output_dir: str,
+    ) -> Optional[Dict[str, Any]]:
+        """MMD, KS per column, Levene variance test per column. Saves statistical_tests.html."""
+        try:
+            from scipy.stats import ks_2samp, levene
+        except ImportError:
+            logger.warning("scipy required for statistical tests.")
+            return None
+
+        try:
+            num_cols = real_df.select_dtypes(include="number").columns.tolist()
+            if not num_cols:
+                return None
+
+            results_per_col: Dict[str, Dict] = {}
+
+            for col in num_cols:
+                r = real_df[col].dropna().values
+                s = synthetic_df[col].dropna().values
+                if len(r) < 2 or len(s) < 2:
+                    continue
+
+                ks_stat, ks_p = ks_2samp(r, s)
+                lev_stat, lev_p = levene(r, s)
+
+                results_per_col[col] = {
+                    "ks_statistic": round(float(ks_stat), 4),
+                    "ks_pvalue": round(float(ks_p), 4),
+                    "levene_statistic": round(float(lev_stat), 4),
+                    "levene_pvalue": round(float(lev_p), 4),
+                    "var_real": round(float(np.var(r)), 4),
+                    "var_synthetic": round(float(np.var(s)), 4),
+                    "var_ratio": round(float(np.var(s) / np.var(r)) if np.var(r) > 0 else float("nan"), 4),
+                }
+
+            # MMD (global, all numeric cols together)
+            mmd_score = self._compute_mmd(
+                real_df[num_cols].fillna(0).values,
+                synthetic_df[num_cols].fillna(0).values,
+            )
+
+            output = {"mmd": round(mmd_score, 6), "per_column": results_per_col}
+
+            if self.verbose:
+                logger.info("Statistical tests — MMD: %.4f, columns tested: %d", mmd_score, len(results_per_col))
+
+            self._save_statistical_tests_html(output, output_dir)
+            return output
+
+        except Exception as e:
+            logger.error("Statistical tests failed: %s", e)
+            return None
+
+    @staticmethod
+    def _compute_mmd(X: np.ndarray, Y: np.ndarray, gamma: float = 1.0) -> float:
+        """Maximum Mean Discrepancy with RBF kernel. Lower = more similar."""
+        # Downsample for speed
+        n = min(500, len(X), len(Y))
+        rng = np.random.default_rng(42)
+        X = X[rng.choice(len(X), n, replace=False)]
+        Y = Y[rng.choice(len(Y), n, replace=False)]
+
+        # Normalize
+        std = X.std(axis=0)
+        std[std == 0] = 1
+        X = (X - X.mean(axis=0)) / std
+        Y = (Y - X.mean(axis=0)) / std
+
+        def rbf(A, B):
+            diff = A[:, None, :] - B[None, :, :]
+            return np.exp(-gamma * np.sum(diff ** 2, axis=-1)).mean()
+
+        return float(rbf(X, X) - 2 * rbf(X, Y) + rbf(Y, Y))
+
+    def _save_statistical_tests_html(self, data: Dict, output_dir: str) -> None:
+        """Saves statistical_tests.html with MMD + per-column KS/Levene table."""
+        try:
+            import plotly.graph_objects as go
+            from plotly.subplots import make_subplots
+        except ImportError:
+            return
+
+        try:
+            cols = list(data["per_column"].keys())
+            if not cols:
+                return
+
+            ks_stats = [data["per_column"][c]["ks_statistic"] for c in cols]
+            ks_ps = [data["per_column"][c]["ks_pvalue"] for c in cols]
+            lev_ps = [data["per_column"][c]["levene_pvalue"] for c in cols]
+            var_real = [data["per_column"][c]["var_real"] for c in cols]
+            var_synth = [data["per_column"][c]["var_synthetic"] for c in cols]
+
+            ks_colors = ["#ef4444" if p < 0.05 else "#22c55e" for p in ks_ps]
+            lev_colors = ["#ef4444" if p < 0.05 else "#22c55e" for p in lev_ps]
+
+            fig = make_subplots(
+                rows=2, cols=2,
+                subplot_titles=[
+                    "KS Statistic per Column (lower = more similar)",
+                    "KS p-value (red = significant difference)",
+                    "Levene p-value (red = variance differs significantly)",
+                    "Variance: Real vs Synthetic",
+                ],
+                vertical_spacing=0.18,
+                horizontal_spacing=0.10,
+            )
+
+            fig.add_trace(go.Bar(x=cols, y=ks_stats, marker_color="#3b82f6", name="KS stat"), row=1, col=1)
+            fig.add_trace(go.Bar(x=cols, y=ks_ps, marker_color=ks_colors, name="KS p-value"), row=1, col=2)
+            fig.add_trace(go.Bar(x=cols, y=lev_ps, marker_color=lev_colors, name="Levene p-value"), row=2, col=1)
+            fig.add_trace(go.Bar(x=cols, y=var_real, name="Real variance", marker_color="#6366f1"), row=2, col=2)
+            fig.add_trace(go.Bar(x=cols, y=var_synth, name="Synthetic variance", marker_color="#f59e0b"), row=2, col=2)
+
+            # p=0.05 reference lines
+            for (r, c) in [(1, 2), (2, 1)]:
+                fig.add_hline(y=0.05, line=dict(color="#94a3b8", dash="dash", width=1), row=r, col=c)
+
+            fig.update_layout(
+                title=dict(
+                    text=f"Statistical Tests — MMD: <b>{data['mmd']:.4f}</b>  "
+                         f"<span style='font-size:13px;color:#64748b'>"
+                         f"(MMD ≈ 0 = distributions match)</span>",
+                    font=dict(size=18),
+                ),
+                height=700,
+                paper_bgcolor="white",
+                plot_bgcolor="white",
+                font=dict(family="Inter, sans-serif", size=12),
+                barmode="group",
+                showlegend=True,
+                margin=dict(t=100, b=60, l=60, r=40),
+            )
+
+            path = os.path.join(output_dir, "statistical_tests.html")
+            fig.write_html(path, include_plotlyjs="cdn")
+            logger.info("Statistical tests report saved to: %s", path)
+
+        except Exception as e:
+            logger.error("Failed to save statistical_tests.html: %s", e)
+
+    def _run_tstr(
+        self,
+        real_df: pd.DataFrame,
+        synthetic_df: pd.DataFrame,
+        target_col: str,
+        output_dir: str,
+    ) -> Optional[Dict[str, Any]]:
+        """Train on Synthetic, Test on Real. RF classifier or regressor depending on target dtype."""
+        try:
+            from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
+            from sklearn.metrics import (
+                balanced_accuracy_score,
+                f1_score,
+                mean_absolute_percentage_error,
+                mean_squared_error,
+                r2_score,
+                roc_auc_score,
+            )
+        except ImportError:
+            logger.warning("scikit-learn required for TSTR. Install with: pip install scikit-learn")
+            return None
+
+        try:
+            if target_col not in real_df.columns or target_col not in synthetic_df.columns:
+                logger.warning("TSTR skipped: target_col '%s' not in both dataframes.", target_col)
+                return None
+
+            # Detect task
+            is_classification = (
+                real_df[target_col].dtype == object
+                or (
+                    real_df[target_col].nunique() <= 20
+                    and real_df[target_col].dtype in (np.int64, np.int32, np.int8, int)
+                )
+            )
+
+            # Prepare features — drop target, encode categoricals
+            feature_cols = [c for c in real_df.columns if c != target_col]
+            synth_X = pd.get_dummies(synthetic_df[feature_cols])
+            real_X = pd.get_dummies(real_df[feature_cols])
+            real_X = real_X.reindex(columns=synth_X.columns, fill_value=0)
+
+            synth_y = synthetic_df[target_col]
+            real_y = real_df[target_col]
+
+            if is_classification:
+                model = RandomForestClassifier(n_estimators=100, random_state=42, n_jobs=-1)
+                model.fit(synth_X, synth_y)
+                preds = model.predict(real_X)
+                proba = model.predict_proba(real_X)
+                classes = model.classes_
+                if len(classes) == 2:
+                    auc = roc_auc_score(real_y, proba[:, 1])
+                else:
+                    auc = roc_auc_score(real_y, proba, multi_class="ovr", average="macro")
+
+                metrics = {
+                    "task": "classification",
+                    "roc_auc": round(float(auc), 4),
+                    "balanced_accuracy": round(float(balanced_accuracy_score(real_y, preds)), 4),
+                    "f1_macro": round(float(f1_score(real_y, preds, average="macro")), 4),
+                }
+                metric_labels = ["ROC AUC", "Balanced Accuracy", "F1 (macro)"]
+                metric_values = [metrics["roc_auc"], metrics["balanced_accuracy"], metrics["f1_macro"]]
+                metric_colors = [
+                    "#3b82f6" if v >= 0.7 else "#f59e0b" if v >= 0.5 else "#ef4444"
+                    for v in metric_values
+                ]
+                task_label = "Classification"
+                interpretation = (
+                    "ROC AUC near 0.5 means synthetic data preserves little predictive signal. "
+                    "Higher values indicate the synthetic data is useful for training."
+                )
+            else:
+                model = RandomForestRegressor(n_estimators=100, random_state=42, n_jobs=-1)
+                model.fit(synth_X, synth_y)
+                preds = model.predict(real_X)
+
+                metrics = {
+                    "task": "regression",
+                    "r2": round(float(r2_score(real_y, preds)), 4),
+                    "mape": round(float(mean_absolute_percentage_error(real_y, preds)), 4),
+                    "rmse": round(float(np.sqrt(mean_squared_error(real_y, preds))), 4),
+                }
+                metric_labels = ["R²", "MAPE", "RMSE"]
+                metric_values = [metrics["r2"], metrics["mape"], metrics["rmse"]]
+                metric_colors = ["#3b82f6", "#f59e0b", "#6366f1"]
+                task_label = "Regression"
+                interpretation = (
+                    "R² close to 1 means synthetic data preserves the target distribution well. "
+                    "Lower MAPE and RMSE indicate better predictive utility."
+                )
+
+            if self.verbose:
+                logger.info("TSTR metrics (%s): %s", task_label, metrics)
+
+            # Generate HTML report
+            self._save_tstr_html(
+                metrics=metrics,
+                metric_labels=metric_labels,
+                metric_values=metric_values,
+                metric_colors=metric_colors,
+                task_label=task_label,
+                interpretation=interpretation,
+                target_col=target_col,
+                n_train=len(synthetic_df),
+                n_test=len(real_df),
+                output_dir=output_dir,
+            )
+
+            return metrics
+
+        except Exception as e:
+            logger.error("TSTR failed: %s", e)
+            return None
+
+    def _save_tstr_html(
+        self,
+        metrics: Dict[str, Any],
+        metric_labels: List[str],
+        metric_values: List[float],
+        metric_colors: List[str],
+        task_label: str,
+        interpretation: str,
+        target_col: str,
+        n_train: int,
+        n_test: int,
+        output_dir: str,
+    ) -> None:
+        """Saves tstr_report.html with a Plotly bar chart + metrics table."""
+        try:
+            import plotly.graph_objects as go
+            from plotly.subplots import make_subplots
+        except ImportError:
+            logger.warning("plotly required to generate TSTR HTML report.")
+            return
+
+        fig = go.Figure(go.Bar(
+            x=metric_labels,
+            y=metric_values,
+            marker_color=metric_colors,
+            text=[f"{v:.4f}" for v in metric_values],
+            textposition="outside",
+        ))
+        fig.update_layout(
+            title=dict(text=f"TSTR — {task_label} ({target_col})", font=dict(size=20)),
+            yaxis=dict(range=[0, max(metric_values) * 1.25], title="Score"),
+            xaxis=dict(title="Metric"),
+            plot_bgcolor="white",
+            paper_bgcolor="white",
+            font=dict(family="Inter, sans-serif", size=13),
+            margin=dict(t=80, b=60, l=60, r=40),
+        )
+
+        rows_html = "".join(
+            f"<tr><td>{k}</td><td><strong>{v}</strong></td></tr>"
+            for k, v in metrics.items() if k != "task"
+        )
+
+        html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>TSTR Report</title>
+<style>
+  body {{ font-family: Inter, sans-serif; background: #f8fafc; padding: 32px; color: #1e293b; }}
+  .card {{ background: white; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,.08); padding: 28px; max-width: 860px; margin: 0 auto 24px; }}
+  h1 {{ font-size: 1.5rem; margin: 0 0 4px; }}
+  .meta {{ color: #64748b; font-size: .9rem; margin-bottom: 20px; }}
+  table {{ width: 100%; border-collapse: collapse; font-size: .95rem; }}
+  th {{ background: #f1f5f9; text-align: left; padding: 10px 14px; font-weight: 600; }}
+  td {{ padding: 10px 14px; border-bottom: 1px solid #e2e8f0; }}
+  .badge {{ display: inline-block; padding: 3px 10px; border-radius: 99px; font-size: .8rem; font-weight: 600; background: #dbeafe; color: #1d4ed8; }}
+  .note {{ background: #f8fafc; border-left: 4px solid #3b82f6; padding: 12px 16px; border-radius: 4px; font-size: .9rem; color: #334155; margin-top: 0; }}
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>TSTR — Train on Synthetic, Test on Real</h1>
+  <p class="meta">
+    <span class="badge">{task_label}</span>&nbsp;
+    Target: <strong>{target_col}</strong> &nbsp;|&nbsp;
+    Train (synthetic): <strong>{n_train}</strong> rows &nbsp;|&nbsp;
+    Test (real): <strong>{n_test}</strong> rows
+  </p>
+  {fig.to_html(full_html=False, include_plotlyjs="cdn")}
+  <br>
+  <table>
+    <tr><th>Metric</th><th>Value</th></tr>
+    {rows_html}
+  </table>
+</div>
+<div class="card">
+  <p class="note">{interpretation}</p>
+</div>
+</body>
+</html>"""
+
+        path = os.path.join(output_dir, "tstr_report.html")
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(html)
+        logger.info("TSTR report saved to: %s", path)

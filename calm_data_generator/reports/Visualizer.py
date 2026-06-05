@@ -939,3 +939,165 @@ class Visualizer:
         except Exception as e:
             logger.error(f"Failed to generate evolution plot: {e}")
             return None
+
+    @staticmethod
+    def generate_spearman_heatmaps(
+        real_df: pd.DataFrame,
+        synthetic_df: pd.DataFrame,
+        output_dir: str,
+        filename: str = "spearman_heatmaps.html",
+    ) -> Optional[str]:
+        """Side-by-side Spearman correlation heatmaps: real vs synthetic."""
+        if not PLOTLY_AVAILABLE:
+            logger.warning("Plotly not available, skipping Spearman heatmaps.")
+            return None
+
+        try:
+            from plotly.subplots import make_subplots
+
+            num_cols = real_df.select_dtypes(include="number").columns.tolist()
+            if len(num_cols) < 2:
+                logger.warning("Spearman heatmaps skipped: need ≥2 numeric columns.")
+                return None
+
+            def _spearman_matrix(df: pd.DataFrame) -> pd.DataFrame:
+                # Rank once per column, then Pearson on ranks — O(n²) BLAS vs O(n²) scipy calls
+                ranked = df.rank(method="average")
+                corr = np.corrcoef(ranked.values.T)
+                return pd.DataFrame(corr, index=df.columns, columns=df.columns)
+
+            real_num = real_df[num_cols].dropna()
+            synth_num = synthetic_df[num_cols].dropna()
+
+            real_corr = _spearman_matrix(real_num)
+            synth_corr = _spearman_matrix(synth_num)
+            diff_corr = synth_corr - real_corr
+
+            fig = make_subplots(
+                rows=1, cols=3,
+                subplot_titles=["Real (Spearman)", "Synthetic (Spearman)", "Difference (Synth − Real)"],
+                horizontal_spacing=0.08,
+            )
+
+            colorscale = "RdBu"
+            for col_idx, (matrix, title) in enumerate([
+                (real_corr, "Real"),
+                (synth_corr, "Synthetic"),
+                (diff_corr, "Difference"),
+            ], start=1):
+                zmin, zmax = (-1, 1) if col_idx < 3 else (-0.5, 0.5)
+                fig.add_trace(
+                    go.Heatmap(
+                        z=matrix.values,
+                        x=num_cols,
+                        y=num_cols,
+                        colorscale=colorscale,
+                        zmin=zmin, zmax=zmax,
+                        showscale=(col_idx == 3),
+                        text=[[f"{v:.2f}" for v in row] for row in matrix.values],
+                        texttemplate="%{text}",
+                        hovertemplate="Row: %{y}<br>Col: %{x}<br>ρ: %{z:.3f}<extra></extra>",
+                    ),
+                    row=1, col=col_idx,
+                )
+
+            n = len(num_cols)
+            fig.update_layout(
+                title=dict(text="Spearman Correlation — Real vs Synthetic", font=dict(size=18)),
+                height=max(400, 120 + n * 40),
+                paper_bgcolor="white",
+                plot_bgcolor="white",
+                font=dict(family="Inter, sans-serif", size=12),
+                margin=dict(t=80, b=40, l=100, r=40),
+            )
+
+            os.makedirs(output_dir, exist_ok=True)
+            path = os.path.join(output_dir, filename)
+            fig.write_html(path, include_plotlyjs="cdn")
+            return path
+
+        except Exception as e:
+            logger.error(f"Failed to generate Spearman heatmaps: {e}")
+            return None
+
+    @staticmethod
+    def generate_qq_plots(
+        real_df: pd.DataFrame,
+        synthetic_df: pd.DataFrame,
+        output_dir: str,
+        filename: str = "qq_plots.html",
+        max_cols: int = 12,
+    ) -> Optional[str]:
+        """QQ plots per numeric column: real quantiles vs synthetic quantiles."""
+        if not PLOTLY_AVAILABLE:
+            logger.warning("Plotly not available, skipping QQ plots.")
+            return None
+
+        try:
+            from plotly.subplots import make_subplots
+
+            num_cols = real_df.select_dtypes(include="number").columns.tolist()[:max_cols]
+            if not num_cols:
+                logger.warning("QQ plots skipped: no numeric columns.")
+                return None
+
+            ncols = min(3, len(num_cols))
+            nrows = (len(num_cols) + ncols - 1) // ncols
+
+            fig = make_subplots(
+                rows=nrows, cols=ncols,
+                subplot_titles=num_cols,
+                vertical_spacing=0.12,
+                horizontal_spacing=0.08,
+            )
+
+            for i, col in enumerate(num_cols):
+                row, col_pos = divmod(i, ncols)
+                real_q = np.quantile(real_df[col].dropna(), np.linspace(0, 1, 100))
+                synth_q = np.quantile(synthetic_df[col].dropna(), np.linspace(0, 1, 100))
+                mn, mx = min(real_q.min(), synth_q.min()), max(real_q.max(), synth_q.max())
+
+                # Diagonal reference line
+                fig.add_trace(
+                    go.Scatter(
+                        x=[mn, mx], y=[mn, mx],
+                        mode="lines",
+                        line=dict(color="#94a3b8", dash="dash", width=1),
+                        showlegend=(i == 0),
+                        name="Perfect match",
+                        hoverinfo="skip",
+                    ),
+                    row=row + 1, col=col_pos + 1,
+                )
+                # QQ scatter
+                fig.add_trace(
+                    go.Scatter(
+                        x=real_q, y=synth_q,
+                        mode="markers",
+                        marker=dict(color="#3b82f6", size=4, opacity=0.7),
+                        showlegend=(i == 0),
+                        name="Quantiles",
+                        hovertemplate=f"Real: %{{x:.3f}}<br>Synth: %{{y:.3f}}<extra>{col}</extra>",
+                    ),
+                    row=row + 1, col=col_pos + 1,
+                )
+
+            fig.update_layout(
+                title=dict(text="QQ Plots — Real vs Synthetic Quantiles", font=dict(size=18)),
+                height=max(400, nrows * 280),
+                paper_bgcolor="white",
+                plot_bgcolor="white",
+                font=dict(family="Inter, sans-serif", size=11),
+                margin=dict(t=80, b=40, l=60, r=40),
+            )
+            fig.update_xaxes(title_text="Real quantiles", showgrid=True, gridcolor="#f1f5f9")
+            fig.update_yaxes(title_text="Synthetic quantiles", showgrid=True, gridcolor="#f1f5f9")
+
+            os.makedirs(output_dir, exist_ok=True)
+            path = os.path.join(output_dir, filename)
+            fig.write_html(path, include_plotlyjs="cdn")
+            return path
+
+        except Exception as e:
+            logger.error(f"Failed to generate QQ plots: {e}")
+            return None

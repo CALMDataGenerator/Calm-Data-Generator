@@ -4487,6 +4487,8 @@ class RealGenerator(BaseGenerator):
         cond: Optional[Any] = None,
         adversarial_validation: bool = False,
         report_config: Optional[Union[ReportConfig, Dict]] = None,
+        epsilon: Optional[float] = None,
+        delta: float = 1e-5,
         **kwargs,
     ) -> Optional[pd.DataFrame]:
         # BUGFIX: Reset history and active state at the start of each generation
@@ -4613,6 +4615,20 @@ class RealGenerator(BaseGenerator):
                 df[col] = data.obs[col].values
             data = df
 
+        _dp_methods = {"dpgan", "pategan"}
+        if epsilon is not None:
+            if epsilon <= 0:
+                raise ValueError(
+                    f"epsilon must be positive (got {epsilon}). "
+                    f"Typical values: 0.1 (strong privacy) to 10.0 (weak privacy)."
+                )
+            if method not in _dp_methods:
+                self.logger.warning(
+                    "epsilon=%.2f has no effect with method='%s'. "
+                    "Use method='dpgan' or method='pategan' for differential privacy.",
+                    epsilon, method,
+                )
+
         self._validate_method(method)
 
         # Validate differentiation and clipping parameters for unsupported methods
@@ -4726,22 +4742,30 @@ class RealGenerator(BaseGenerator):
                     **kwargs,
                 )
             elif method == "dpgan":
+                _dp_kwargs = {**(kwargs or {})}
+                if epsilon is not None:
+                    _dp_kwargs.setdefault("epsilon", epsilon)
+                    _dp_kwargs.setdefault("delta", delta)
                 synth = self._synthesize_dpgan(
                     data,
                     n_samples,
                     target_col=target_col,
                     custom_distributions=custom_distributions,
                     cond=cond,
-                    **(kwargs or {}),
+                    **_dp_kwargs,
                 )
             elif method == "pategan":
+                _dp_kwargs = {**(kwargs or {})}
+                if epsilon is not None:
+                    _dp_kwargs.setdefault("epsilon", epsilon)
+                    _dp_kwargs.setdefault("delta", delta)
                 synth = self._synthesize_pategan(
                     data,
                     n_samples,
                     target_col=target_col,
                     custom_distributions=custom_distributions,
                     cond=cond,
-                    **(kwargs or {}),
+                    **_dp_kwargs,
                 )
             elif method == "tvae":
                 synth = self._synthesize_tvae(

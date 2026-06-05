@@ -87,3 +87,9 @@ docs/site/
 # Type checking
 .mypy_cache/
 calm_data_generator/data/expression.bin
+.github/
+mose_benchmark/
+.ruff_cache/
+poc_*
+scripts/
+notebooks/
