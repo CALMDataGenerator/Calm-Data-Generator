@@ -5167,7 +5167,7 @@ class RealGenerator(BaseGenerator):
                     target_column=target_col,
                     time_col=time_col_name,
                     drift_config=report_drift_config,
-                    adversarial_validation=adversarial_validation,
+                    discriminator=adversarial_validation,
                     report_config=report_config,  # Pass the config object
                 )
 
