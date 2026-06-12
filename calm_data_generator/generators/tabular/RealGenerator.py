@@ -5047,10 +5047,15 @@ class RealGenerator(BaseGenerator):
                     ScenarioInjector,
                 )
 
-                injector = ScenarioInjector(
-                    random_state=self.random_state, logger=self.logger
-                )
-                synth = injector.apply_config(synth, dynamics_config)
+                injector = ScenarioInjector(seed=self.random_state)
+                if "evolve_features" in dynamics_config:
+                    synth = injector.evolve_features(
+                        synth, evolution_config=dynamics_config["evolve_features"]
+                    )
+                if "construct_target" in dynamics_config:
+                    synth = injector.construct_target(
+                        synth, **dynamics_config["construct_target"]
+                    )
 
             # --- Date Injection (if not done in dynamics) ---
             if date_config and date_config.start_date:

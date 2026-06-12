@@ -635,7 +635,6 @@ class ClinicalDataGenerator(ComplexGenerator):
             if gene_type.lower() == "microarray":
                 loc = np.random.normal(loc=gene_mean_loc_center, scale=1.0)
                 scale = np.random.uniform(low=0.5, high=2.0)
-                scale = np.random.uniform(low=0.5, high=2.0)
                 base_gene_marginals[i] = stats.norm(loc=loc, scale=scale)
             else:  # RNA-Seq
                 log_mean = np.random.normal(loc=gene_mean_log_center, scale=1.5)
@@ -826,11 +825,11 @@ class ClinicalDataGenerator(ComplexGenerator):
         drift_injection_config: Optional[List[Dict]] = None,
         dynamics_config: Optional[Dict] = None,
     ) -> pd.DataFrame:
-        if n_proteins <= 0:
-            return pd.DataFrame()  # Return empty DF
         """
         Generates synthetic protein expression data using post-generation stochastic effects.
         """
+        if n_proteins <= 0:
+            return pd.DataFrame()  # Return empty DF
         # --- 1. Handle Demographic Data ---
         patient_ids, groups, idx_control, idx_disease, demographic_marginals = (
             self._prepare_demographic_context(

@@ -53,7 +53,7 @@ class ComplexGenerator(BaseGenerator):
         Z_mod = np.random.multivariate_normal(
             mean=mean_vec, cov=sigma_module, size=n_samples
         )
-        U_mod = stats.norm.cdf(Z_mod)
+        U_mod = np.clip(stats.norm.cdf(Z_mod), 1e-6, 1 - 1e-6)
 
         X_mod = np.zeros((n_samples, n_mod_vars))
         for i, marginal in enumerate(marginals_list):
@@ -162,7 +162,7 @@ class ComplexGenerator(BaseGenerator):
         Z_target = mu_cond + Z_noise
 
         # 5. Transform Z_target to X_target using target marginals
-        U_target = stats.norm.cdf(Z_target)
+        U_target = np.clip(stats.norm.cdf(Z_target), 1e-6, 1 - 1e-6)
         X_target = np.zeros((n_samples, n_target))
         for i, marginal in enumerate(target_marginals):
             X_target[:, i] = marginal.ppf(U_target[:, i])

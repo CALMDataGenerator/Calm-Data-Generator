@@ -64,7 +64,7 @@ def list_tutorials():
             if '"""' in content:
                 start = content.find('"""') + 3
                 end = content.find("\n", start)
-                title = content[start:end].strip()
+                title = content[start:end].strip() if end != -1 else content[start:].strip()
             else:
                 title = name.replace("_", " ").title()
 

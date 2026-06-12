@@ -1,0 +1,52 @@
+{
+  "generator_name": "cart_drifted_feature_drift",
+  "generation_timestamp": "2026-06-12T10:48:29.842571",
+  "real_rows": 50,
+  "synthetic_rows": 50,
+  "quality_scores": {
+    "overall_quality_score": 0.92,
+    "weighted_quality_score": 0.5704
+  },
+  "quality_by_block": null,
+  "compared_data_files": {
+    "original": "real_data",
+    "generated": "synthetic_data"
+  },
+  "sequential_quality": null,
+  "privacy_metrics": null,
+  "constraints_stats": null,
+  "ari_metrics": null,
+  "tstr_metrics": null,
+  "statistical_metrics": {
+    "mmd": 0.005839,
+    "per_column": {
+      "numeric_normal": {
+        "ks_statistic": 0.24,
+        "ks_pvalue": 0.1124,
+        "levene_statistic": 0.0,
+        "levene_pvalue": 1.0,
+        "var_real": 0.5561,
+        "var_synthetic": 0.5561,
+        "var_ratio": 1.0
+      },
+      "numeric_int": {
+        "ks_statistic": 0.0,
+        "ks_pvalue": 1.0,
+        "levene_statistic": 0.0,
+        "levene_pvalue": 1.0,
+        "var_real": 744.2624,
+        "var_synthetic": 744.2624,
+        "var_ratio": 1.0
+      },
+      "target": {
+        "ks_statistic": 0.0,
+        "ks_pvalue": 1.0,
+        "levene_statistic": 0.0,
+        "levene_pvalue": 1.0,
+        "var_real": 0.1716,
+        "var_synthetic": 0.1716,
+        "var_ratio": 1.0
+      }
+    }
+  }
+}

@@ -1,0 +1,67 @@
+
+                <div style="font-family: 'Segoe UI', sans-serif; padding: 20px; max-width: 1200px; margin: auto;">
+                    <h1 style="color: #333;">🌊 Drift Analysis Report</h1>
+
+                    <div style="display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 30px;">
+                        <div style="background: linear-gradient(135deg, #667eea, #764ba2); color: white; padding: 20px; border-radius: 12px; flex: 1; min-width: 200px;">
+                            <div style="font-size: 14px; opacity: 0.8;">AFFECTED COLUMNS</div>
+                            <div style="font-size: 24px; font-weight: bold;">numeric_normal</div>
+                        </div>
+                        <div style="background: linear-gradient(135deg, #f093fb, #f5576c); color: white; padding: 20px; border-radius: 12px; flex: 1; min-width: 200px;">
+                            <div style="font-size: 14px; opacity: 0.8;">DRIFT TYPE</div>
+                            <div style="font-size: 24px; font-weight: bold;">shift</div>
+                        </div>
+                        <div style="background: linear-gradient(135deg, #4facfe, #00f2fe); color: white; padding: 20px; border-radius: 12px; flex: 1; min-width: 200px;">
+                            <div style="font-size: 14px; opacity: 0.8;">MAGNITUDE</div>
+                            <div style="font-size: 24px; font-weight: bold;">2.0</div>
+                        </div>
+                        <div style="background: linear-gradient(135deg, #fa709a, #fee140); color: white; padding: 20px; border-radius: 12px; flex: 1; min-width: 200px;">
+                            <div style="font-size: 14px; opacity: 0.8;">DUPLICATES WITH ORIGINAL</div>
+                            <div style="font-size: 24px; font-weight: bold;">0.0%</div>
+                        </div>
+                    </div>
+
+                <h2>Statistical Metrics by Feature</h2>
+                <table style="width: 100%; border-collapse: collapse; margin-bottom: 30px;">
+                    <tr style="background: #f8f9fa;">
+                        <th style="padding: 12px; text-align: left; border-bottom: 2px solid #dee2e6;">Feature</th>
+                        <th style="padding: 12px; text-align: center; border-bottom: 2px solid #dee2e6;">Severity</th>
+                        <th style="padding: 12px; text-align: center; border-bottom: 2px solid #dee2e6;">JS Div</th>
+                        <th style="padding: 12px; text-align: center; border-bottom: 2px solid #dee2e6;">KS Stat</th>
+                        <th style="padding: 12px; text-align: center; border-bottom: 2px solid #dee2e6;">KS p-value</th>
+                        <th style="padding: 12px; text-align: center; border-bottom: 2px solid #dee2e6;">Cohen's d</th>
+                        <th style="padding: 12px; text-align: center; border-bottom: 2px solid #dee2e6;">Mean Δ%</th>
+                    </tr>
+
+                    <tr>
+                        <td style="padding: 10px; border-bottom: 1px solid #dee2e6; font-weight: bold;">numeric_normal</td>
+                        <td style="padding: 10px; text-align: center; border-bottom: 1px solid #dee2e6;">
+                            <span style="background: #dc3545; color: white; padding: 3px 8px; border-radius: 12px; font-size: 11px; font-weight: bold;">HIGH</span>
+                        </td>
+                        <td style="padding: 10px; text-align: center; border-bottom: 1px solid #dee2e6; color: #dc3545;">0.6806</td>
+                        <td style="padding: 10px; text-align: center; border-bottom: 1px solid #dee2e6;">0.2400</td>
+                        <td style="padding: 10px; text-align: center; border-bottom: 1px solid #dee2e6; color: #28a745;">0.1124</td>
+                        <td style="padding: 10px; text-align: center; border-bottom: 1px solid #dee2e6;">-0.231</td>
+                        <td style="padding: 10px; text-align: center; border-bottom: 1px solid #dee2e6;">-200.0%</td>
+                    </tr>
+                </table>
+                <h2>📈 Before/After Statistics</h2>
+                <table style="width: 100%; border-collapse: collapse; margin-bottom: 30px;">
+                    <tr style="background: #f8f9fa;">
+                        <th style="padding: 12px; text-align: left; border-bottom: 2px solid #dee2e6;">Feature</th>
+                        <th style="padding: 12px; text-align: center; border-bottom: 2px solid #dee2e6;">Original Mean</th>
+                        <th style="padding: 12px; text-align: center; border-bottom: 2px solid #dee2e6;">Original Std</th>
+                        <th style="padding: 12px; text-align: center; border-bottom: 2px solid #dee2e6;">Drifted Mean</th>
+                        <th style="padding: 12px; text-align: center; border-bottom: 2px solid #dee2e6;">Drifted Std</th>
+                        <th style="padding: 12px; text-align: center; border-bottom: 2px solid #dee2e6;">Change</th>
+                    </tr>
+
+                    <tr>
+                        <td style="padding: 10px; border-bottom: 1px solid #dee2e6; font-weight: bold;">numeric_normal</td>
+                        <td style="padding: 10px; text-align: center; border-bottom: 1px solid #dee2e6;">-0.0863</td>
+                        <td style="padding: 10px; text-align: center; border-bottom: 1px solid #dee2e6;">0.7457</td>
+                        <td style="padding: 10px; text-align: center; border-bottom: 1px solid #dee2e6;">-0.2588</td>
+                        <td style="padding: 10px; text-align: center; border-bottom: 1px solid #dee2e6;">0.7457</td>
+                        <td style="padding: 10px; text-align: center; border-bottom: 1px solid #dee2e6; color: #dc3545; font-weight: bold;">-200.0%</td>
+                    </tr>
+                </table></div>

@@ -656,6 +656,8 @@ class Visualizer:
 
             # Generate Plotly density plots
             n_density_cols = min(6, len(sorted_cols))
+            if n_density_cols == 0:
+                return
             n_cols = min(3, n_density_cols)
             n_rows = (n_density_cols + n_cols - 1) // n_cols
 

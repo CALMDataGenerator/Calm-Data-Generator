@@ -98,8 +98,6 @@ class EvolutionFeatureConfig(BaseModel):
     func: Optional[str] = None            # "linear"|"exponential"|"power"|"polynomial"
     func_params: Optional[dict] = None    # parameters for func
 
-    _VALID_TYPES = {"linear", "cycle", "sigmoid", "exponential_growth", "exponential_decay", "noise", "random_walk", "step", "driven_by"}
-
     @field_validator("type")
     @classmethod
     def type_valid(cls, v: str) -> str:

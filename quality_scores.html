@@ -1,0 +1,49 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        .score-card {
+            font-family: 'Segoe UI', Tahoma, sans-serif;
+            display: flex;
+            gap: 40px;
+            padding: 20px;
+            justify-content: center;
+        }
+        .score-box {
+            text-align: center;
+            padding: 20px 40px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .score-value {
+            font-size: 48px;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        .score-label {
+            font-size: 14px;
+            color: #6c757d;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+    </style>
+</head>
+<body>
+    <div class="score-card">
+        <div class="score-box">
+            <div class="score-label">Overall Quality</div>
+            <div class="score-value" style="color: #28a745">
+                92.0%
+            </div>
+        </div>
+        <div class="score-box">
+            <div class="score-label">Weighted Quality</div>
+            <div class="score-value" style="color: #ffc107">
+                57.0%
+            </div>
+        </div>
+    </div>
+</body>
+</html>

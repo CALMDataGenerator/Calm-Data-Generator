@@ -2616,8 +2616,8 @@ class DriftInjector:
 
         # Extract and standardize data
         X = df_drift.loc[rows, valid_cols].values.astype(float)
-        means = np.mean(X, axis=0)
-        stds = np.std(X, axis=0)
+        means = np.nanmean(X, axis=0)
+        stds = np.nanstd(X, axis=0)
         stds[stds == 0] = 1.0  # Avoid division by zero
         X_std = (X - means) / stds
 

@@ -1029,11 +1029,12 @@ class QualityReporter(BaseReporter):
         X = X[rng.choice(len(X), n, replace=False)]
         Y = Y[rng.choice(len(Y), n, replace=False)]
 
-        # Normalize
+        # Normalize both using X's statistics
+        X_mean = X.mean(axis=0)
         std = X.std(axis=0)
         std[std == 0] = 1
-        X = (X - X.mean(axis=0)) / std
-        Y = (Y - X.mean(axis=0)) / std
+        X = (X - X_mean) / std
+        Y = (Y - X_mean) / std
 
         def rbf(A, B):
             diff = A[:, None, :] - B[None, :, :]
