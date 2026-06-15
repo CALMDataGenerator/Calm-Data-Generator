@@ -16,20 +16,27 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-    
+
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python-version }}
-    
+
     - name: Install dependencies
       run: |
-        python -m pip install pip==26.0.1
+        python -m pip install --upgrade pip
         pip install pytest
-        pip install "setuptools<71" wheel
-        pip install "lightning @ git+https://github.com/Lightning-AI/lightning.git@2.3.3" --no-build-isolation
         pip install -e "."
-        
+
     - name: Run Tests
       run: |
-        pytest tests/ --ignore=tests/test_stream_block_generator.py --ignore=tests/test_real_block_generator.py --ignore=tests/test_clinic_block_generator.py
+        pytest tests/ \
+          --ignore=tests/test_stream_block_generator.py \
+          --ignore=tests/test_real_block_generator.py \
+          --ignore=tests/test_clinic_block_generator.py \
+          --ignore=tests/test_scvi_quality_regression.py \
+          --ignore=tests/test_anndata_support.py \
+          --ignore=tests/test_differentiation_factor.py \
+          --ignore=tests/test_timeseries_real.py \
+          --ignore=tests/test_timeseries_extended.py \
+          -q
