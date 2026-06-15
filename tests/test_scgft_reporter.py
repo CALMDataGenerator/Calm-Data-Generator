@@ -2,6 +2,7 @@ import io
 import os
 import shutil
 import sys
+import tempfile
 import unittest
 from unittest.mock import MagicMock, patch
 
@@ -46,13 +47,12 @@ def _mock_scgft_modules(run_all_side_effect=None):
 class TestScGFTReporter(unittest.TestCase):
 
     def setUp(self):
-        self.output_dir = "test_scgft_output"
-        os.makedirs(self.output_dir, exist_ok=True)
+        self._tmpdir = tempfile.TemporaryDirectory()
+        self.output_dir = self._tmpdir.name
         self.real_df, self.synth_df = _make_dataframes()
 
     def tearDown(self):
-        if os.path.exists(self.output_dir):
-            shutil.rmtree(self.output_dir)
+        self._tmpdir.cleanup()
 
     def test_scgft_integration(self):
         def mock_run_all(a1, a2, genes_top, col_grupo, grupo_a, grupo_b, **kwargs):
