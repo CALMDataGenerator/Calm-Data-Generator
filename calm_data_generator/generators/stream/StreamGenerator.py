@@ -565,6 +565,12 @@ class StreamGenerator(BaseGenerator):
             try:
                 x, y = next(it)
             except StopIteration:
+                import warnings
+                warnings.warn(
+                    f"Stream iterator exhausted after {len(rows)} of {n_samples} requested samples.",
+                    RuntimeWarning,
+                    stacklevel=2,
+                )
                 break
             rows.append(list(x.values()) + [y])
         return rows

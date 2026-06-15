@@ -93,6 +93,9 @@ class SyntheticBlockGenerator:
             "random_rbf": GeneratorType.RANDOM_RBF,
         }
 
+        if n_blocks <= 0:
+            raise ValueError(f"n_blocks must be > 0, got {n_blocks}.")
+
         methods = self._ensure_list(methods, n_blocks)
         if len(set(methods)) > 1:
             raise ValueError(
@@ -251,6 +254,8 @@ class SyntheticBlockGenerator:
             block_df["block"] = current_block_label
             all_data.append(block_df)
 
+        if not all_data:
+            raise RuntimeError("No blocks were generated. Check generator parameters.")
         df = pd.concat(all_data, ignore_index=True)
 
         # --- Dynamics Injection ---
