@@ -39,8 +39,8 @@ dependencies = [
     "numba>=0.62.0,<0.63.0",
     "llvmlite>=0.45.0,<0.46.0",
     "scikit-learn>=1.7.0,<1.8.0",
-    "torch>=2.2.0,<2.3.0",
-    "torchvision>=0.17.0,<0.18.0",
+    "torch>=2.2.0",
+    "torchvision>=0.17.0",
     "lightgbm>=4.6.0,<4.7.0",
     "imbalanced-learn>=0.14.0,<0.15.0",
     "copulae>=0.7.9,<0.8.0",
@@ -50,8 +50,6 @@ dependencies = [
     "lightning>=2.3.0,<2.4.0",
     "torchmetrics>=1.8.0,<1.9.0",
     "plotly>=6.5.0,<6.6.0",
-    "cell-gears>=0.1.2,<0.2.0",
-    "torch-geometric>=2.7.0,<2.8.0",
     "huggingface-hub>=0.36.0,<1.0.0",
     "transformers>=4.22.1,<5.0.0",
     "xgboost>=2.1.0,<2.2.0",
@@ -70,9 +68,18 @@ stream = [
     "river>=0.21.0"
 ]
 
-full = [
-    "calm-data-generator[stream]",
+# GEARS/torch-geometric require CUDA/CPU-specific wheels from the PyG index.
+# Install manually BEFORE installing this package:
+#   pip install torch-geometric>=2.7.0 --find-links https://data.pyg.org/whl/torch-<VERSION>+<PLATFORM>.html
+#   pip install cell-gears>=0.1.2
+# Then: pip install calm-data-generator[gears]
+gears = [
+    "torch-geometric>=2.7.0",
+    "cell-gears>=0.1.2,<0.2.0",
+]
 
+full = [
+    "calm-data-generator[stream,gears]",
 ]
 
 [tool.ruff]

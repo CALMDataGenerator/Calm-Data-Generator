@@ -266,45 +266,69 @@ Una ventaja clave de **Calm-Data-Generator** es permitir el uso de datos privado
 ## Instalación
 
  > [!WARNING]
- > **Aviso Importante**: Esta librería depende de frameworks de Deep Learning pesados como `PyTorch`, `Synthcity` y librerías `CUDA`.
- > La instalación puede ser **pesada (~2-3 GB)** y tardar unos minutos dependiendo de tu conexión. Recomendamos encarecidamente usar un entorno virtual limpio.
+ > La instalación es **pesada (~2-3 GB)** y puede tardar varios minutos. Usa un entorno virtual limpio.
 
  ### Estrategia de Versiones
 
  - **GitHub (Recomendado para últimas novedades)**: La rama `main` contiene la versión más actualizada con los últimos arreglos y funcionalidades.
  - **PyPI (Estable)**: Las versiones en PyPI son estables y se actualizan con menor frecuencia para cambios mayores.
 
- ### Instalación Estándar (PyPI - Estable)
- La librería está disponible en PyPI. Para una experiencia estable, recomendamos usar un entorno virtual:
+### Paso 1 — Instala PyTorch para tu hardware
+
+PyTorch debe instalarse **antes** que la librería para que pip resuelva el wheel correcto (CPU, CUDA o ROCm).
 
 ```bash
-# 1. Crear y activar el entorno virtual
-python3 -m venv venv
-source venv/bin/activate
+# CPU — Mac Intel, CI, sin GPU
+pip install "torch>=2.2.0" "torchvision>=0.17.0"
 
-# 2. Actualizar pip, setuptools y wheel (Crucial para una instalación exitosa)
+# CUDA 12.4 — Linux / Windows con GPU NVIDIA
+pip install "torch>=2.2.0" "torchvision>=0.17.0" --index-url https://download.pytorch.org/whl/cu124
+
+# ROCm 6.1 — Linux con GPU AMD
+pip install "torch>=2.2.0" "torchvision>=0.17.0" --index-url https://download.pytorch.org/whl/rocm6.1
+
+# Mac Apple Silicon (M1/M2/M3) — MPS se auto-detecta, no necesitas wheel especial
+pip install "torch>=2.2.0" "torchvision>=0.17.0"
+```
+
+> Sustituye `cu124` por tu versión de CUDA instalada (p. ej. `cu118`, `cu121`). Consúltala con `nvidia-smi`.
+
+### Paso 2 — Instala la librería
+
+```bash
 pip install --upgrade pip setuptools wheel
-
-# 3. Instalar la librería (optimizada para velocidad)
 pip install calm-data-generator
 ```
 
-### Extras de Instalación
-Puedes añadir capacidades específicas según tu caso de uso:
+### Extras opcionales
+
 ```bash
-# Para Stream Generator (River)
+# Soporte streaming con River
 pip install "calm-data-generator[stream]"
 
+# Predicción de perturbaciones con GEARS (requiere wheels de PyG — ver abajo)
+pip install "calm-data-generator[gears]"
 
-# Instalación completa
+# Suite completa (stream + gears)
 pip install "calm-data-generator[full]"
 ```
 
-> [!NOTE]
-> **Nota de Rendimiento y Estabilidad**: Hemos optimizado el árbol de dependencias desde la versión 1.0.0 bloqueando versiones específicas como `pydantic`, `xgboost` y `cloudpickle`. Esto mejora la compatibilidad y reduce problemas de instalación.
+> **GEARS / PyTorch Geometric** requiere wheels específicos del índice PyG.
+> Instálalos **antes** de `calm-data-generator[gears]`:
+> ```bash
+> # Consulta tu versión de torch primero
+> python -c "import torch; print(torch.__version__)"
+>
+> # Ejemplo CPU (sustituye torch-2.2.0 y +cpu por tu versión y plataforma)
+> pip install torch-geometric --find-links https://data.pyg.org/whl/torch-2.2.0+cpu.html
+>
+> # Ejemplo CUDA 12.4
+> pip install torch-geometric --find-links https://data.pyg.org/whl/torch-2.2.0+cu124.html
+>
+> pip install "calm-data-generator[gears]"
+> ```
 
 **Desde fuente (GitHub - Últimas Actualizaciones):**
-Usa este método para obtener los últimos arreglos y funcionalidades aún no disponibles en PyPI.
 
 ```bash
 # Opción A: Instalar directamente desde GitHub
@@ -354,12 +378,6 @@ New-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem" `
 ```
 Reinicia el equipo y vuelve a intentar la instalación. Alternativamente, instala tu entorno virtual en una ruta corta (p. ej. `C:\venv\`) para reducir la longitud total de la ruta.
 
-**PyTorch solo-CPU (sin GPU):**
-```bash
-pip install torch --index-url https://download.pytorch.org/whl/cpu
-pip install calm-data-generator
-```
-
 ---
 
 ## Inicio Rápido
@@ -396,28 +414,26 @@ print(f"Generadas {len(synthetic)} muestras")
 
 ### Aceleración por GPU
 
-**Métodos con soporte GPU:**
+La GPU se **auto-detecta** en tiempo de ejecución en el orden CUDA → MPS → CPU. No se necesita ningún parámetro adicional.
 
-| Método | Soporte GPU | Parámetro |
-|--------|-------------|-----------|
-| `ctgan`, `tvae` | Sí — CUDA/MPS | `enable_gpu=True` |
-| `diffusion` | Sí — PyTorch | Auto-detectado |
-| `ddpm` | Sí — PyTorch + Synthcity | Auto-detectado |
-| `timegan` | Sí — PyTorch + Synthcity | Auto-detectado |
-| `timevae` | Sí — PyTorch + Synthcity | Auto-detectado |
-| `fflows` | Sí — PyTorch + Synthcity | Auto-detectado |
+| Método | Soporte de dispositivo | Notas |
+| ------ | ---------------------- | ----- |
+| `scvi`, `scanvi` | CUDA · MPS · CPU | Auto-detectado vía Lightning accelerator |
+| `gears` | CUDA · MPS · CPU | Auto-detectado vía PyTorch device |
+| `ctgan`, `tvae`, `rtvae`, `ddpm`, `timegan`, `timevae`, `fflows`, `dpgan`, `pategan`, `great` | CUDA · CPU | Auto-detectado internamente por Synthcity |
+| `cart`, `rf`, `lgbm`, `xgboost`, `gmm`, `copula`, `windowed_copula`, `kde`, `smote`, `adasyn`, `hmm`, `bn` | Solo CPU | Estadístico / árboles, sin ruta GPU |
 
-| `smote`, `adasyn`, `cart`, `rf`, `lgbm`, `gmm`, `copula` | No — Solo CPU | - |
+**Mac Apple Silicon (M1/M2/M3):** MPS se usa automáticamente para `scvi`, `scanvi` y `gears` cuando `torch.backends.mps.is_available()` devuelve `True`. Instala el wheel CPU estándar — no se necesita ningún wheel especial.
+
+Para forzar el dispositivo manualmente:
 
 ```python
-synthetic = gen.generate(
-    data=data,
-    n_samples=1000,
-    method='ctgan',
-    epochs=300,
-    enable_gpu=True,
+# Forzar CPU para scVI/scANVI
+gen.generate(data=data, n_samples=1000, method='scvi', accelerator='cpu')
 
-)
+# Forzar dispositivo específico para GEARS
+gen.generate(data=data, n_samples=1000, method='gears', device='cuda')
+gen.generate(data=data, n_samples=1000, method='gears', device='mps')
 ```
 
 ### Generar Datos Clínicos
@@ -566,27 +582,36 @@ reporter.generate_comprehensive_report(
 
 ## Métodos de Síntesis
 
-| Método | Tipo | Descripción | Requisitos / Notas |
-|--------|------|-------------|-------------------|
-| `cart` | ML | Síntesis iterativa basada en CART (rápido) | Instalación base |
-| `rf` | ML | Síntesis con Random Forest | Instalación base |
-| `lgbm` | ML | Síntesis basada en LightGBM | Instalación base (Requiere `lightgbm`) |
-| `ctgan` | DL | GAN Condicional para datos tabulares | Requiere `synthcity` |
-| `tvae` | DL | Autoencoder Variacional | Requiere `synthcity` |
-| `diffusion` | DL | Difusión Tabular (custom, rápida) | Instalación base (PyTorch) |
-| `ddpm` | DL | Synthcity TabDDPM (avanzado) | Requiere `synthcity` |
-| `timegan` | Series Temp. | TimeGAN para datos secuenciales | Requiere `synthcity` |
-| `timevae` | Series Temp. | TimeVAE para datos secuenciales | Requiere `synthcity` |
-| `fflows` | Series Temp. | FourierFlows — flujos normalizantes en dominio de frecuencia, estable para series periódicas | Requiere `synthcity` |
-| `bn` | DL / Probabilístico | Red Bayesiana — modela dependencias causales entre variables | Requiere `synthcity` |
-| `smote` | Aumento | Sobremuestreo SMOTE | Instalación base |
-| `adasyn` | Aumento | Muestreo adaptativo ADASYN | Instalación base |
-| `copula` | Copula | Síntesis basada en Copulas | Instalación base |
-| `gmm` | Estadístico | Modelos de Mezcla Gaussiana | Instalación base |
-| `scvi` | Single-Cell | scVI (Variational Inference) para RNA-seq | Requiere `scvi-tools` |
-| `conditional_drift` | Drift Nativo | Condicionamiento temporal con TVAE/CTGAN | Requiere `synthcity` |
-| `windowed_copula` | Drift Nativo | Cópula Gaussiana interpolada por ventanas | Instalación base |
-| `hmm` | Drift Nativo | Modelo Oculto de Markov — drift por transición de regímenes | Requiere `hmmlearn` |
+| Método | Tipo | Descripción | Requisitos |
+| ------ | ---- | ----------- | ---------- |
+| `cart` | ML | Síntesis iterativa basada en CART (rápido) | Base |
+| `rf` | ML | Síntesis con Random Forest | Base |
+| `lgbm` | ML | Síntesis basada en LightGBM | Base |
+| `xgboost` | ML | Síntesis basada en XGBoost | Base |
+| `gmm` | Estadístico | Modelos de Mezcla Gaussiana | Base |
+| `kde` | Estadístico | Estimación por Núcleo (solo numérico) | Base |
+| `copula` | Estadístico | Síntesis basada en Cópula Gaussiana | Base |
+| `windowed_copula` | Drift Nativo | Cópula Gaussiana interpolada por ventanas temporales | Base |
+| `hmm` | Drift Nativo | Modelo Oculto de Markov — drift por transición de regímenes | Base |
+| `smote` | Aumento | Sobremuestreo SMOTE | Base |
+| `adasyn` | Aumento | Muestreo adaptativo ADASYN | Base |
+| `resample` | Aumento | Remuestreo ponderado de los datos originales | Base |
+| `ctgan` | DL | GAN Condicional para datos tabulares | `synthcity` |
+| `tvae` | DL | Autoencoder Variacional | `synthcity` |
+| `rtvae` | DL | TVAE Robusto | `synthcity` |
+| `great` | DL | GReaT — generación tabular basada en LLM | `synthcity` |
+| `bn` | Probabilístico | Red Bayesiana — dependencias causales entre variables | `synthcity` |
+| `diffusion` | DL | Difusión Tabular (custom, ligera) | Base (PyTorch) |
+| `ddpm` | DL | TabDDPM — difusión avanzada | `synthcity` |
+| `dpgan` | DL + Privacidad | GAN con privacidad diferencial | `synthcity` |
+| `pategan` | DL + Privacidad | PATE-GAN — privacidad por ensemble de profesores | `synthcity` |
+| `timegan` | Series Temp. | TimeGAN para datos secuenciales | `synthcity` |
+| `timevae` | Series Temp. | TimeVAE para datos secuenciales | `synthcity` |
+| `fflows` | Series Temp. | FourierFlows — flujos normalizantes, estable para series periódicas | `synthcity` |
+| `conditional_drift` | Drift Nativo | Condicionamiento temporal por etapas vía TVAE/CTGAN | `synthcity` |
+| `scvi` | Single-Cell | scVI (VAE) para datos de expresión RNA-seq | `scvi-tools` |
+| `scanvi` | Single-Cell | scANVI — scVI semi-supervisado con etiquetas | `scvi-tools` |
+| `gears` | Single-Cell | GEARS — predicción de perturbaciones vía GNN | extra `[gears]` |
 
 ---
 

@@ -274,45 +274,69 @@ Minimalist view of the system's core components and data flow.
 ## Installation
 
  > [!WARNING]
- > The installation might be **heavy (~2-3 GB)** and take a few minutes depending on your internet connection. We strongly recommend using a fresh virtual environment.
+ > The installation is **heavy (~2-3 GB)** and may take several minutes. Use a fresh virtual environment.
 
  ### Versioning Strategy
 
  - **GitHub (Recommended for latest features)**: The `main` branch contains the most up-to-date version with the latest bug fixes and features.
  - **PyPI (Stable)**: Releases on PyPI are stable versions updated less frequently for major changes.
 
- ### Standard Installation (PyPI - Stable)
- The library is available on PyPI. For the most stable experience, we recommend using a virtual environment:
+### Step 1 — Install PyTorch for your hardware
+
+PyTorch must be installed **before** the library so pip resolves the correct wheel (CPU, CUDA, or ROCm).
 
 ```bash
-# 1. Create and activate a virtual environment
-python3 -m venv venv
-source venv/bin/activate
+# CPU — Mac Intel, CI environments, no GPU
+pip install "torch>=2.2.0" "torchvision>=0.17.0"
 
-# 2. Upgrade pip, setuptools and wheel (Crucial for successful installation)
+# CUDA 12.4 — Linux / Windows with NVIDIA GPU
+pip install "torch>=2.2.0" "torchvision>=0.17.0" --index-url https://download.pytorch.org/whl/cu124
+
+# ROCm 6.1 — Linux with AMD GPU
+pip install "torch>=2.2.0" "torchvision>=0.17.0" --index-url https://download.pytorch.org/whl/rocm6.1
+
+# Mac Apple Silicon (M1/M2/M3) — MPS is auto-detected, no special wheel needed
+pip install "torch>=2.2.0" "torchvision>=0.17.0"
+```
+
+> Replace `cu124` with your installed CUDA version (e.g. `cu118`, `cu121`). Find yours with `nvidia-smi`.
+
+### Step 2 — Install the library
+
+```bash
 pip install --upgrade pip setuptools wheel
-
-# 3. Install the core library (optimized for speed)
 pip install calm-data-generator
 ```
 
-### Installation Extras
-Depending on your needs, you can install additional capabilities:
+### Optional extras
+
 ```bash
-# For Stream Generator (River)
+# River streaming support
 pip install "calm-data-generator[stream]"
 
+# GEARS perturbation prediction (requires PyG wheels — see below)
+pip install "calm-data-generator[gears]"
 
-
-# Full suite
+# Full suite (stream + gears)
 pip install "calm-data-generator[full]"
 ```
 
-> [!NOTE]
-> **Performance & Stability Note**: We have optimized the dependency tree since version 1.0.0 by pinning specific versions such as `pydantic`, `xgboost`, and `cloudpickle`. This improves compatibility and reduces installation issues.
+> **GEARS / PyTorch Geometric** requires platform-specific wheels from the PyG index.
+> Install them **before** `calm-data-generator[gears]`:
+> ```bash
+> # Get your torch version first
+> python -c "import torch; print(torch.__version__)"
+>
+> # CPU example (replace torch-2.2.0 and +cpu with your version and platform)
+> pip install torch-geometric --find-links https://data.pyg.org/whl/torch-2.2.0+cpu.html
+>
+> # CUDA 12.4 example
+> pip install torch-geometric --find-links https://data.pyg.org/whl/torch-2.2.0+cu124.html
+>
+> pip install "calm-data-generator[gears]"
+> ```
 
 **From source (GitHub - Latest Updates):**
-Use this method to get the latest bug fixes and features not yet released on PyPI.
 
 ```bash
 # Option A: Install directly from GitHub
@@ -362,12 +386,6 @@ New-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem" `
 ```
 Then restart your machine and retry installation. Alternatively, install your virtual environment in a short root path (e.g. `C:\venv\`) to reduce total path length.
 
-**PyTorch CPU-only (no GPU):**
-```bash
-pip install torch --index-url https://download.pytorch.org/whl/cpu
-pip install calm-data-generator
-```
-
 **Dependency conflicts:** Use a clean virtual environment:
 ```bash
 python -m venv venv
@@ -411,34 +429,27 @@ print(f"Generated {len(synthetic)} samples")
 
 ### GPU Acceleration
 
-**Methods with GPU support:**
+GPU is **auto-detected** at runtime in the order CUDA → MPS → CPU. No parameter is needed for most methods.
 
-| Method | GPU Support | Parameter |
-|--------|-------------|-----------|
-| `ctgan`, `tvae` | Yes — CUDA/MPS | `enable_gpu=True` |
-| `diffusion` | Yes — PyTorch | Auto-detected |
-| `ddpm` | Yes — PyTorch + Synthcity | Auto-detected |
-| `timegan` | Yes — PyTorch + Synthcity | Auto-detected |
-| `timevae` | Yes — PyTorch + Synthcity | Auto-detected |
-| `fflows` | Yes — PyTorch + Synthcity | Auto-detected |
+| Method | Device support | Notes |
+| ------ | -------------- | ----- |
+| `scvi`, `scanvi` | CUDA · MPS · CPU | Auto-detected via Lightning accelerator |
+| `gears` | CUDA · MPS · CPU | Auto-detected via PyTorch device |
+| `ctgan`, `tvae`, `rtvae`, `ddpm`, `timegan`, `timevae`, `fflows`, `dpgan`, `pategan`, `great` | CUDA · CPU | Auto-detected internally by Synthcity |
+| `cart`, `rf`, `lgbm`, `xgboost`, `gmm`, `copula`, `windowed_copula`, `kde`, `smote`, `adasyn`, `hmm`, `bn` | CPU only | Statistical / tree-based, no GPU path |
 
-| `smote`, `adasyn`, `cart`, `rf`, `lgbm`, `gmm`, `copula` | No — CPU only | - |
+**Mac Apple Silicon (M1/M2/M3):** MPS is used automatically for `scvi`, `scanvi`, and `gears` when `torch.backends.mps.is_available()` returns `True`. Install the standard CPU wheel — no special MPS wheel is required.
+
+To override the device explicitly:
 
 ```python
-synthetic = gen.generate(
-    data=data,
-    n_samples=1000,
-    method='ctgan',
-    epochs=300,
-    enable_gpu=True,
+# Force CPU for scVI/scANVI
+gen.generate(data=data, n_samples=1000, method='scvi', accelerator='cpu')
 
-)
+# Force a specific device for GEARS
+gen.generate(data=data, n_samples=1000, method='gears', device='cuda')
+gen.generate(data=data, n_samples=1000, method='gears', device='mps')
 ```
-
-> **Note:** Requires PyTorch with CUDA support:
-> ```bash
-> pip install torch --index-url https://download.pytorch.org/whl/cu118
-> ```
 
 ### Generate Clinical Data
 
@@ -634,29 +645,36 @@ reporter.generate_comprehensive_report(
 
 ## Synthesis Methods
 
-| Method | Type | Description | Requirements / Notes |
-|--------|------|-------------|----------------------|
-| `cart` | ML | CART-based iterative synthesis (fast) | Base installation |
-| `rf` | ML | Random Forest synthesis | Base installation |
-| `lgbm` | ML | LightGBM-based synthesis | Base installation (Requires `lightgbm`) |
-| `ctgan` | DL | Conditional GAN for tabular data | Requires `synthcity` |
-| `tvae` | DL | Variational Autoencoder | Requires `synthcity` |
-| `diffusion` | DL | Tabular Diffusion (custom, fast) | Base installation (PyTorch) |
-| `ddpm` | DL | Synthcity TabDDPM (advanced) | Requires `synthcity` |
-| `timegan` | Time Series | TimeGAN for sequential data | Requires `synthcity` |
-| `timevae` | Time Series | TimeVAE for sequential data | Requires `synthcity` |
-| `fflows` | Time Series | FourierFlows — normalizing flows for temporal data, stable for periodic series | Requires `synthcity` |
-| `bn` | DL / Probabilistic | Bayesian Network — models causal dependencies between features | Requires `synthcity` |
-| `smote` | Augmentation | SMOTE oversampling | Base installation |
-| `adasyn` | Augmentation | ADASYN adaptive sampling | Base installation |
-
-
-| `copula` | Copula | Copula-based synthesis | Base installation |
-| `gmm` | Statistical | Gaussian Mixture Models | Base installation |
-| `scvi` | Single-Cell | scVI (Variational Inference) for RNA-seq | Requires `scvi-tools` |
-| `conditional_drift` | Drift-Aware | Temporal conditioning via TVAE/CTGAN | Requires `synthcity` |
-| `windowed_copula` | Drift-Aware | Gaussian Copula interpolated across time windows | Base installation |
-| `hmm` | Drift-Aware | Hidden Markov Model — drift via regime transitions | Requires `hmmlearn` |
+| Method | Type | Description | Requirements |
+| ------ | ---- | ----------- | ------------ |
+| `cart` | ML | CART-based iterative synthesis (fast) | Base |
+| `rf` | ML | Random Forest synthesis | Base |
+| `lgbm` | ML | LightGBM-based synthesis | Base |
+| `xgboost` | ML | XGBoost-based synthesis | Base |
+| `gmm` | Statistical | Gaussian Mixture Models | Base |
+| `kde` | Statistical | Kernel Density Estimation (numeric only) | Base |
+| `copula` | Statistical | Gaussian Copula synthesis | Base |
+| `windowed_copula` | Drift-Aware | Gaussian Copula interpolated across time windows | Base |
+| `hmm` | Drift-Aware | Hidden Markov Model — drift via regime transitions | Base |
+| `smote` | Augmentation | SMOTE oversampling | Base |
+| `adasyn` | Augmentation | ADASYN adaptive sampling | Base |
+| `resample` | Augmentation | Weighted resampling from original data | Base |
+| `ctgan` | DL | Conditional GAN for tabular data | `synthcity` |
+| `tvae` | DL | Variational Autoencoder | `synthcity` |
+| `rtvae` | DL | Robust TVAE | `synthcity` |
+| `great` | DL | GReaT — LLM-based tabular generation | `synthcity` |
+| `bn` | Probabilistic | Bayesian Network — causal dependencies | `synthcity` |
+| `diffusion` | DL | Tabular Diffusion (custom, lightweight) | Base (PyTorch) |
+| `ddpm` | DL | TabDDPM — advanced diffusion | `synthcity` |
+| `dpgan` | DL + Privacy | Differentially private GAN | `synthcity` |
+| `pategan` | DL + Privacy | PATE-GAN — teacher-ensemble privacy | `synthcity` |
+| `timegan` | Time Series | TimeGAN for sequential data | `synthcity` |
+| `timevae` | Time Series | TimeVAE for sequential data | `synthcity` |
+| `fflows` | Time Series | FourierFlows — normalizing flows, stable for periodic series | `synthcity` |
+| `conditional_drift` | Drift-Aware | Temporal stage conditioning via TVAE/CTGAN | `synthcity` |
+| `scvi` | Single-Cell | scVI (VAE) for RNA-seq expression data | `scvi-tools` |
+| `scanvi` | Single-Cell | scANVI — semi-supervised, label-aware scVI | `scvi-tools` |
+| `gears` | Single-Cell | GEARS — perturbation prediction via GNN | `[gears]` extra |
 
 
 ---

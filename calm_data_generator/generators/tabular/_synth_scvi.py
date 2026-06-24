@@ -112,8 +112,13 @@ class _ScviSynthMixin:
         self.logger.info("Training base scVI model...")
         scvi.model.SCVI.setup_anndata(adata)
         scvi_model = scvi.model.SCVI(adata, n_latent=n_latent, n_layers=n_layers)
+        _accelerator = kwargs.get("accelerator", self._get_lightning_accelerator())
         try:
-            scvi_model.train(max_epochs=epochs, early_stopping=early_stopping)
+            scvi_model.train(
+                max_epochs=epochs,
+                early_stopping=early_stopping,
+                accelerator=_accelerator,
+            )
         except Exception as e:
             self.logger.error(f"scVI base training failed: {e}")
             return None
@@ -126,7 +131,11 @@ class _ScviSynthMixin:
                 labels_key=target_col,
                 unlabeled_category=unlabeled_category,
             )
-            scanvi_model.train(max_epochs=scanvi_epochs, early_stopping=early_stopping)
+            scanvi_model.train(
+                max_epochs=scanvi_epochs,
+                early_stopping=early_stopping,
+                accelerator=_accelerator,
+            )
             self._report_scvi_history(scanvi_model)
         except Exception as e:
             self.logger.error(f"scANVI training failed: {e}")
@@ -379,6 +388,7 @@ class _ScviSynthMixin:
         train_kwargs = {
             "max_epochs": epochs,
             "early_stopping": early_stopping,
+            "accelerator": kwargs.get("accelerator", self._get_lightning_accelerator()),
         }
 
         # Add early_stopping_patience if provided in kwargs
@@ -638,7 +648,7 @@ class _ScviSynthMixin:
         # Setup GEARS parameters
         epochs = kwargs.get("epochs", 20)
         batch_size = kwargs.get("batch_size", 32)
-        device = kwargs.get("device", "cpu")
+        device = kwargs.get("device", self._get_torch_device())
         hidden_size = kwargs.get("hidden_size", 64)
 
         self.logger.info(

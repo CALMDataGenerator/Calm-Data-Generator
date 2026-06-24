@@ -20,6 +20,26 @@ from tqdm import tqdm
 
 class _SynthUtilsMixin:
 
+    @staticmethod
+    def _get_torch_device() -> str:
+        """Returns 'cuda', 'mps', or 'cpu' — best device available."""
+        import torch
+        if torch.cuda.is_available():
+            return "cuda"
+        if getattr(torch.backends, "mps", None) and torch.backends.mps.is_available():
+            return "mps"
+        return "cpu"
+
+    @staticmethod
+    def _get_lightning_accelerator() -> str:
+        """Returns the Lightning/scVI accelerator string for the best available device."""
+        import torch
+        if torch.cuda.is_available():
+            return "gpu"
+        if getattr(torch.backends, "mps", None) and torch.backends.mps.is_available():
+            return "mps"
+        return "cpu"
+
     def _get_model_params(
         self, method: str, user_params: Optional[Dict] = None
     ) -> Dict:
