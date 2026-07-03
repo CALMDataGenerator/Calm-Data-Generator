@@ -30,16 +30,32 @@ Aceptamos activamente tus pull requests.
 
 ```bash
 # Clona tu fork
-git clone https://github.com/TU-USUARIO/Calm-Data-Generator.git
-cd Calm-Data-Generator
+git clone https://github.com/TU-USUARIO/Calm-Data_Generator.git
+cd Calm-Data_Generator
 
 # Crea venv
 python3 -m venv venv
 source venv/bin/activate
 
-# Instala en modo editable con dependencias de desarrollo
-pip install -e ".[dev]"
+# Instala en modo editable (no existe extra "dev" — instala las herramientas aparte)
+pip install -e ".[full]"
+pip install pytest ruff pre-commit
+
+# Activa los hooks de pre-commit (ruff, trailing-whitespace, end-of-file-fixer)
+pre-commit install
 ```
+
+Antes de abrir un PR, lee [ARCHITECTURE.md](./ARCHITECTURE.md) para un mapa
+de los módulos — te indicará qué archivo tocar para tu cambio.
+
+## Ejecutar Tests
+
+```bash
+pytest tests/
+```
+
+Los tests que dependen de `river` se saltan automáticamente si no está
+instalado (`pip install -e ".[stream]"` para habilitarlos).
 
 ## Licencia
 

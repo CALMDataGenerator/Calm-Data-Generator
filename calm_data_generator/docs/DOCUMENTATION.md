@@ -15,6 +15,9 @@
 11. [Configuration Options](#configuration-options)
 12. [Best Practices](#best-practices)
 
+> **Architecture:** for a map of modules and data flow before diving into a
+> specific reference, see [ARCHITECTURE.md](../../ARCHITECTURE.md).
+
 > **Detailed Module References:**
 > - [RealGenerator](./REAL_GENERATOR_REFERENCE.md)
 > - [RealBlockGenerator](./REAL_BLOCK_GENERATOR_REFERENCE.md)

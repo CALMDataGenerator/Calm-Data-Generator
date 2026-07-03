@@ -6,7 +6,7 @@ Methods: _get_model_params, _validate_method, _get_synthesizer,
          _build_cond_tensor, _validate_custom_distributions,
          _patch_synthcity_encoder, _synthesize_split_by_class,
          _apply_postprocess_distribution, _apply_resampling_strategy,
-         _inject_dates.
+         _inject_dates, _synthesize_fcs_generic.
 """
 
 import math
@@ -536,3 +536,249 @@ class _SynthUtilsMixin:
             f"[RealGenerator] Injected date column '{date_col}' starting at {start_ts}."
         )
         return df
+
+    def _synthesize_fcs_generic(
+        self,
+        data: pd.DataFrame,
+        n_samples: int,
+        custom_distributions: Optional[Dict],
+        model_factory_func,
+        method_name: str,
+        iterations: int,
+        target_col: Optional[str] = None,
+    ) -> Optional[pd.DataFrame]:
+        """
+        Generic helper for Fully Conditional Specification (FCS) synthesis.
+
+        Args:
+            data: Original dataframe.
+            n_samples: Number of samples to generate.
+            custom_distributions: Optional customs distribution dict.
+            model_factory_func: Callable(is_classification: bool, model_params: dict) -> model instance.
+            method_name: Name of the method for logging.
+            iterations: Number of FCS iterations.
+        """
+        from calm_data_generator.generators.persistence_models import FCSModel
+
+        self.logger.info(f"Starting {method_name} (FCS-style) synthesis...")
+
+        if custom_distributions:
+            self.logger.warning(
+                f"For '{method_name}' method, custom distributions are handled by resampling the training data."
+            )
+
+        # Prepare initial synthetic data (bootstrap)
+        X_real = data.copy()
+
+        # Convert datetime columns to numeric (int64 unix nanoseconds) so sklearn can handle them
+        datetime_cols = X_real.select_dtypes(include=["datetime64", "datetime"]).columns.tolist()
+        for _dc in datetime_cols:
+            X_real[_dc] = X_real[_dc].astype(np.int64)
+
+        # If target column is specified and has balanced distribution requested,
+        # we balance the STARTING point (bootstrap) so FCS doesn't have to work as hard
+        # to move the distribution, and to avoid bias from the starting features.
+        X_bootstrap_source = X_real
+        if target_col and custom_distributions and target_col in custom_distributions:
+            self.logger.info(f"Balancing bootstrap source for column '{target_col}'...")
+            X_res, y_res = self._apply_resampling_strategy(
+                X_real.drop(columns=target_col),
+                X_real[target_col],
+                custom_distributions[target_col],
+                len(X_real),
+            )
+            # Reconstruct the full balanced dataframe
+            X_bootstrap_source = X_res.copy()
+            X_bootstrap_source[target_col] = y_res
+
+        # Ensure object columns are category for consistency
+        for col in X_real.select_dtypes(include=["object"]).columns:
+            X_real[col] = X_real[col].astype("category")
+            X_bootstrap_source[col] = X_bootstrap_source[col].astype("category")
+
+        # Initial random sample
+        # OPTIMIZATION: Instead of pure random sample (which might miss rare categories),
+        # we repeat the original dataset as many times as possible, then sample the rest.
+        n_real = len(X_bootstrap_source)
+        if n_samples > n_real:
+            n_repeats = n_samples // n_real
+            remainder = n_samples % n_real
+            X_synth_list = [X_bootstrap_source] * n_repeats
+            if remainder > 0:
+                X_synth_list.append(
+                    X_bootstrap_source.sample(
+                        n=remainder, replace=False, random_state=self.random_state
+                    )
+                )
+            X_synth = pd.concat(X_synth_list, ignore_index=True)
+            # Shuffle to break order
+            X_synth = X_synth.sample(
+                frac=1, random_state=self.random_state
+            ).reset_index(drop=True)
+        else:
+            # If we need fewer samples than real data, standard sample is fine (or could be stratified)
+            X_synth = X_bootstrap_source.sample(
+                n=n_samples, replace=True, random_state=self.random_state
+            ).reset_index(drop=True)
+
+        # Align categories for LGBM/Categorical handling
+        cat_cols = X_real.select_dtypes(include="category").columns
+        for col in cat_cols:
+            X_synth[col] = pd.Categorical(
+                X_synth[col], categories=X_real[col].cat.categories
+            )
+
+        try:
+            # Storage for persistence
+            fitted_models = {}
+            encoding_info = {col: X_real[col].cat.categories for col in cat_cols}
+
+            # Marginals for initialization (using raw values for sampling)
+            # We store the unique values and their counts to sample with replacement respecting distribution
+            marginals = {}
+            for col in X_real.columns:
+                marginals[col] = X_real[
+                    col
+                ].values  # Storing full column values might be heavy?
+                # Optimization: Store value_counts if cardinality is low, else sample?
+                # Actually, storing values allows np.random.choice easily.
+                # If data is huge, we might want to store just unique and counts.
+                # For now let's store values (simplest for 'bootstrap' init).
+
+            # Or better, just store the bootstrap source we created?
+            # X_bootstrap_source is balanced.
+            # But the persistent model generates from scratch.
+            # Let's populate marginals from X_bootstrap_source (balanced if requested).
+            marginals = {
+                c: X_bootstrap_source[c].values for c in X_bootstrap_source.columns
+            }
+
+            for it in tqdm(range(iterations), desc=f"{method_name} Iterations"):
+                # self.logger.info(f"{method_name} iteration {it + 1}/{iterations}")
+                for col in X_real.columns:
+                    y_real_train = X_real[col]
+                    Xr_real_train = X_real.drop(columns=col)
+                    Xs_synth = X_synth.drop(columns=col)
+
+                    # Determine task type
+                    is_classification = False
+                    if not pd.api.types.is_numeric_dtype(y_real_train):
+                        is_classification = True
+                    # Heuristic for low-cardinality numeric targets (treat as class)
+                    elif col == target_col:
+                        unique_values = y_real_train.nunique()
+                        if (
+                            unique_values < 25
+                            or (unique_values / len(y_real_train)) < 0.05
+                        ):
+                            is_classification = True
+
+                    # Model instantiation via factory
+                    model = model_factory_func(is_classification)
+
+                    # Prepare training data (potentially applying custom distributions)
+                    y_to_fit, X_to_fit = (y_real_train, Xr_real_train)
+                    if custom_distributions and col in custom_distributions:
+                        X_to_fit, y_to_fit = self._apply_resampling_strategy(
+                            Xr_real_train,
+                            y_real_train,
+                            custom_distributions[col],
+                            len(Xr_real_train),
+                        )
+
+                    # Encode categorical features for sklearn-based models (CART/RF)
+                    # LGBM handles categories natively, but generic sklearn trees do not.
+                    # We check if the model is LGBM-like by class name string check or attribute.
+                    is_lgbm = "LGBM" in model.__class__.__name__
+
+                    if not is_lgbm:
+                        # Sklearn encoding — use assign() to avoid full DataFrame copy
+                        cat_cols = [
+                            c for c in X_to_fit.columns
+                            if pd.api.types.is_categorical_dtype(X_to_fit[c])
+                            or isinstance(X_to_fit[c].dtype, pd.CategoricalDtype)
+                        ]
+                        fit_updates = {}
+                        synth_updates = {}
+                        for c in cat_cols:
+                            fit_cat = X_to_fit[c].astype("category")
+                            try:
+                                synth_cast = Xs_synth[c].astype(fit_cat.dtype)
+                            except Exception as e:
+                                self.logger.debug(f"dtype cast failed for column '{c}'; forcing category alignment. Reason: {e}")
+                                synth_cast = pd.Categorical(
+                                    Xs_synth[c],
+                                    categories=fit_cat.cat.categories,
+                                )
+                            fit_updates[c] = fit_cat.cat.codes
+                            # synth_cast is a Series (has .cat) or a pd.Categorical (has .codes directly)
+                            synth_updates[c] = synth_cast.cat.codes if isinstance(synth_cast, pd.Series) else synth_cast.codes
+                        X_to_fit = X_to_fit.assign(**fit_updates)
+                        Xs_synth_input = Xs_synth.assign(**synth_updates)
+                    else:
+                        # LGBM input
+                        Xs_synth_input = Xs_synth
+
+                    try:
+                        model.fit(X_to_fit, y_to_fit)
+                    except ValueError as e:
+                        if "Input contains NaN" in str(e):
+                            raise ValueError(
+                                f"The '{method_name}' method failed due to NaNs. Please pre-clean data."
+                            ) from e
+                        raise e
+
+                    # Store model if last iteration
+                    if it == iterations - 1:
+                        import copy
+
+                        try:
+                            fitted_models[col] = copy.deepcopy(model)
+                        except Exception as e:
+                            self.logger.warning(f"deepcopy failed for model on column '{col}'; storing reference instead. Reason: {e}")
+                            fitted_models[col] = model  # Fallback if deepcopy fails
+
+                    if (
+                        is_classification
+                        and hasattr(model, "predict_proba")
+                        and not (custom_distributions and col in custom_distributions)
+                    ):
+                        # Probabilistic sampling for better distribution preservation
+                        # but we skip it if we are already forcing a distribution via resampling
+                        # to avoid double-amplification/overshooting.
+                        probs = model.predict_proba(Xs_synth_input)
+                        classes = model.classes_
+
+                        # Sample for each row
+                        _rng = np.random.default_rng(self.random_state)
+                        y_synth_pred = np.array(
+                            [_rng.choice(classes, p=p) for p in probs]
+                        )
+                    else:
+                        # Regression, balancing via resampling, or fallback
+                        y_synth_pred = model.predict(Xs_synth_input)
+
+                    # Restore categorical type if needed
+                    if y_real_train.dtype.name == "category":
+                        y_synth_pred = pd.Categorical(
+                            y_synth_pred, categories=y_real_train.cat.categories
+                        )
+
+                    X_synth[col] = y_synth_pred
+
+            # End of loop
+            # Instantiate FCSModel
+            self.synthesizer = FCSModel(
+                models=fitted_models,
+                marginals=marginals,
+                encoding_info=encoding_info,
+                visit_order=list(X_real.columns),
+                random_state=self.random_state,
+            )
+            self.method = method_name
+            self.metadata = {"columns": data.columns.tolist()}
+
+            return X_synth
+        except Exception as e:
+            self.logger.error(f"{method_name} synthesis failed: {e}", exc_info=True)
+            return None

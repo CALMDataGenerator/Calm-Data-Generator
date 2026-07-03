@@ -64,6 +64,10 @@ Cada método de síntesis está respaldado por una o más librerías de código 
 
 Bienvenido a la documentación completa de **Calm Data Generator**. Esta guía cubre la instalación, configuración y uso avanzado de todos los módulos.
 
+> **Arquitectura:** para un mapa de módulos y flujo de datos antes de entrar
+> en una referencia concreta, ver [ARCHITECTURE.md](../../ARCHITECTURE.md)
+> (en inglés).
+
 > **Nota:** Para documentos de referencia de API específicos, ver:
 > - [RealGenerator API](./REAL_GENERATOR_REFERENCE_ES.md)
 > - [DriftInjector API](./DRIFT_INJECTOR_REFERENCE_ES.md)

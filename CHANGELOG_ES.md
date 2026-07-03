@@ -4,6 +4,28 @@ Todos los cambios notables de CALM-Data-Generator están documentados aquí.
 
 ---
 
+## [2.2.1] — 2026-04-29
+
+### Nuevas Funcionalidades
+
+- **`RealGenerator.encode_to_latent()` / `decode_from_latent()`**: Ida y vuelta de un dataset por el espacio latente del modelo entrenado para `tvae`, `rtvae`, `scvi` y `scanvi`. Gestiona internamente el preprocesado (TabularEncoder, tensores de condicionamiento, tamaño de librería de SCVI) para que los análisis de drift externos no tengan que reimplementar el pipeline de encode/decode por cada método.
+
+### Corrección de Errores
+
+- **`QualityReporter` — detección de duplicados cruzados**: corregido un fallo/cero silencioso cuando las columnas de real y sintético tenían dtypes distintos; ahora el merge se restringe a columnas compartidas y castea los dtypes del sintético antes de comparar.
+- **`RealBlockGenerator.generate_block()`**: `model_params` ahora se propaga como `**kwargs` a la llamada subyacente `RealGenerator.generate()` en vez de pasarse como argumento posicional sin usar, así los parámetros de modelo por bloque sí tienen efecto.
+- **`ExternalReporter`**: el flag `minimal` ahora se pasa correctamente a `ProfileReport` de `ydata-profiling` (antes se aceptaba pero se ignoraba en silencio).
+
+### Dependencias
+
+- Pin de `scgft-evaluator` cambiado de URL git (`git+https://github.com/nasim23ea/scgft-evaluator.git`) a rango de versión de PyPI (`>=0.1.0,<0.2.0`).
+
+### Experiencia de Desarrollo
+
+- Limpieza de ordenación de imports y espacios en blanco (ruff) en `RealBlockGenerator.py`, `QualityReporter.py`, `ExternalReporter.py`.
+
+---
+
 ## [2.2.0] — 2026-04-23
 
 ### Nuevas Funcionalidades
