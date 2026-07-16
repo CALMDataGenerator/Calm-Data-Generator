@@ -16,12 +16,12 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-    
+
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python-version }}
-    
+
     - name: Install dependencies
       run: |
         python -m pip install pip==26.0.1
@@ -29,7 +29,7 @@ jobs:
         pip install "setuptools<71" wheel
         pip install "lightning @ git+https://github.com/Lightning-AI/lightning.git@2.3.3" --no-build-isolation
         pip install -e "."
-      
+
     - name: Show installed packages
       run: pip list
 
@@ -37,3 +37,18 @@ jobs:
       run: |
         # En modo basic, ignoramos stream y block generators que requieren 'river'
         pytest tests/ --tb=short --ignore=tests/test_stream_block_generator.py --ignore=tests/test_real_block_generator.py --ignore=tests/test_clinic_block_generator.py --ignore=tests/test_timeseries_real.py --ignore=tests/test_end_to_end.py --ignore=tests/test_river_integration.py --ignore=tests/test_discriminator_reporter.py
+
+  check-doc-pairs:
+    # Advisory only: warns if a PR touches one side of an EN/ES doc pair (e.g.
+    # README.md / README_ES.md) without the other. Never fails the build.
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check EN/ES doc pairs
+        run: |
+          CHANGED_FILES=$(git diff --name-only origin/${{ github.base_ref }}...HEAD -- '*.md')
+          python3 .github/scripts/check_doc_pairs.py $CHANGED_FILES
