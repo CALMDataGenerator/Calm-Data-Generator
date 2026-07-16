@@ -305,8 +305,11 @@ class _LatentMixin:
                             [label_map.get(l, 0) for l in labels],
                             dtype=torch.long,
                         ).unsqueeze(1).to(device)
-                except Exception:
-                    pass
+                except Exception as e:
+                    self.logger.warning(
+                        f"Could not build label tensor for gene-label dispersion; "
+                        f"falling back to unconditioned generation (y=None). Reason: {e}"
+                    )
 
             with torch.no_grad():
                 gen_out = model.module.generative(

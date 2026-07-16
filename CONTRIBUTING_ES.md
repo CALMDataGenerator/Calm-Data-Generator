@@ -24,7 +24,12 @@ Aceptamos activamente tus pull requests.
 1.  **Haz un Fork** del repositorio y crea tu rama desde `main`.
 2.  Si has añadido código, añade los tests correspondientes.
 3.  Asegúrate de que tu código pasa el linter (`ruff`).
-4.  ¡Envía el pull request!
+4.  **Si has editado un archivo de documentación que tiene par EN/ES** (p. ej. `README.md` /
+    `README_ES.md`, o cualquier archivo en `calm_data_generator/docs/`), **actualiza ambos en
+    el mismo PR.** El CI publicará un aviso no bloqueante si detecta una edición de un solo
+    lado — trátalo como recordatorio, no como requisito estricto, pero se espera mantener
+    ambas versiones sincronizadas.
+5.  ¡Envía el pull request!
 
 ## Configuración de Desarrollo
 

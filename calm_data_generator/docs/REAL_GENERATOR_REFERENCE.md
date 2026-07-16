@@ -82,10 +82,11 @@ synthetic_df = gen.generate(
 | `generator_name` | str | `"RealGenerator"` | Base name for output files |
 | `save_dataset` | bool | `False` | Whether to save the generated dataset to a CSV file |
 | `custom_distributions` | Dict | `None` | Force specific distributions for columns |
+| `custom_distribution` | Dict | `None` | ⚠️ Legacy singular alias for `custom_distributions`. Logs a warning when used — prefer the plural form. |
 | `date_col` | str | `None` | Name of the date column to inject |
-| `date_start` | str | `None` | Start date ("YYYY-MM-DD") |
-| `date_step` | Dict | `None` | Time increment (e.g., `{"days": 1}`) |
-| `date_every` | int | `1` | Increment date every N rows |
+| `date_start` | str | `None` | ⚠️ Legacy. Start date ("YYYY-MM-DD"). Logs a warning when used without `date_config` — prefer `date_config=DateConfig(...)`. |
+| `date_step` | Dict | `None` | ⚠️ Legacy — same note as `date_start`. Time increment (e.g., `{"days": 1}`) |
+| `date_every` | int | `1` | ⚠️ Legacy — same note as `date_start`. Increment date every N rows |
 | `drift_injection_config` | List[Union[Dict, DriftConfig]] | `None` | Configuration for post-generation drift injection |
 | `dynamics_config` | Dict | `None` | Configuration for dynamic feature evolution |
 | `model_params` | Dict | `None` | Model-specific hyperparameters (passed as `**kwargs`) |
@@ -95,6 +96,36 @@ synthetic_df = gen.generate(
 | `date_config` | DateConfig | `None` | Advanced date injection configuration object |
 | `balance` | bool | `False` | Automatically balance class distribution in `target_col` |
 | `**kwargs` | Any | - | Method-specific parameters (e.g., `epochs`, `n_latent`, `lr`) |
+
+---
+
+## Simpler API: `fit()` / `sample()`
+
+For the common case — train once, sample as many times as you want — `RealGenerator` offers a
+thin, sklearn-style wrapper around `generate()`:
+
+```python
+gen = RealGenerator(auto_report=False, random_state=42)
+
+# Trains the model. Does not write any report/dataset to disk.
+gen.fit(df, method="cart", target_col="target")
+
+# Draws synthetic rows from the fitted model, as many times as you like — no retraining.
+synth_small = gen.sample(100)
+synth_large = gen.sample(10_000)
+
+# Chaining works too:
+synth = RealGenerator().fit(df, method="ctgan").sample(1000)
+```
+
+- `fit(data, method="cart", target_col=None, **kwargs)` accepts the same keyword arguments as
+  `generate()` (minus `n_samples`, `output_dir`, `save_dataset`) and returns `self`.
+- `sample(n_samples)` raises a clear `ValueError` if called before `fit()` (or `.load()`).
+- Internally, `sample()` calls `generate(data=None, n_samples=...)`, which was already able to
+  reuse a previously-trained `self.synthesizer` without retraining — `fit()`/`sample()` simply
+  give that existing capability a more discoverable, conventional name.
+- For one-shot calls (train + generate + report in a single call), `generate()` is still the
+  right choice.
 
 ---
 

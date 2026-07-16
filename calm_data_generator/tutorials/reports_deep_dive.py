@@ -7,16 +7,20 @@ calm_data_generator to assess data quality, privacy and drift.
 
 We will cover:
 1. QualityReporter: Comparing Real vs Synthetic Data
-2. StreamReporter: Analyzing Synthetic Data Streams
-3. PrivacyReporter: Assessing Anonymization Utility/Privacy Trade-offs
+2. evaluate(): Lightweight, in-memory fidelity check (no files written)
+3. StreamReporter: Analyzing Synthetic Data Streams
+4. Privacy Assessment: DCR, NNDR and Singling-Out risk via QualityReporter
 """
 
-import pandas as pd
-import numpy as np
 import os
 import shutil
-from calm_data_generator.generators.tabular import QualityReporter
+
+import numpy as np
+import pandas as pd
+
 from calm_data_generator.generators.stream import StreamReporter
+from calm_data_generator.generators.tabular import QualityReporter
+
 # Note: PrivacyReporter removed - use QualityReporter with privacy_check=True
 
 # Setup output directory
@@ -65,18 +69,33 @@ print("\n--- Running QualityReporter ---")
 quality_reporter = QualityReporter(verbose=True)
 
 # Generate comprehensive report
-# This creates report_results.json, html profiles, and visualizations
-quality_reporter.generate_comprehensive_report(
+# This creates report_results.json, html profiles, and visualizations.
+# Since v2.3.0, generate_comprehensive_report() also returns that same results dict.
+quality_report_results = quality_reporter.generate_comprehensive_report(
     real_df=real_df,
     synthetic_df=synthetic_df,
     generator_name="Tutorial_Synthetic_Gen",
     output_dir=os.path.join(OUTPUT_DIR, "quality_report"),
     target_column="target",
-    privacy_check=True,  # Calculates DCR metrics
+    privacy_check=True,  # Calculates DCR, NNDR, and Singling-Out risk (if anonymeter installed)
+    tstr=True,  # Also runs TSTR (Train Synthetic, Test Real)
     minimal=False,  # Set to True for faster execution (skips PCA/Correlations)
 )
 
 print("Quality report generated.")
+print("Statistical metrics (KS/MMD/Wasserstein):", quality_report_results["statistical_metrics"])
+
+# ============================================================
+# 2b. evaluate() - Lightweight, In-Memory Fidelity Check
+# ============================================================
+
+# For a fast check without writing any file (e.g. inside a training loop or a test),
+# use evaluate() instead of generate_comprehensive_report(). It computes the same
+# quality/statistical/TSTR metrics, but not privacy metrics (those stay file-report-only).
+print("\n--- Running QualityReporter.evaluate() (no files written) ---")
+eval_result = quality_reporter.evaluate(real_df, synthetic_df, target_column="target")
+print("quality_scores:", eval_result["quality_scores"])
+print("tstr_metrics:", eval_result["tstr_metrics"])
 
 # ============================================================
 # 3. StreamReporter (Single Synthetic Dataset)
@@ -101,9 +120,19 @@ print("Stream report generated.")
 # ============================================================
 
 print("\n--- Privacy Assessment with QualityReporter ---")
-print("Privacy features are now integrated into QualityReporter.")
-print("Use privacy_check=True to calculate Distance to Closest Record (DCR) metrics.")
-print("See the quality_report above - it already includes privacy metrics!")
+print("Privacy features are integrated into QualityReporter via privacy_check=True.")
+privacy_metrics = quality_report_results.get("privacy_metrics") or {}
+print("DCR  (Distance to Closest Record):", privacy_metrics.get("dcr_mean"), "/",
+      privacy_metrics.get("dcr_5th_percentile"), "(mean / 5th percentile)")
+print("NNDR (Nearest Neighbor Distance Ratio):", privacy_metrics.get("nndr_mean"), "/",
+      privacy_metrics.get("nndr_5th_percentile"), "(mean / 5th percentile)")
+singling_out = privacy_metrics.get("singling_out")
+if singling_out is not None:
+    print("Singling-Out risk:", singling_out["risk"],
+          f"(95% CI: {singling_out['ci_low']}-{singling_out['ci_high']})")
+else:
+    print("Singling-Out risk: not computed (install with `pip install "
+          "calm-data-generator[privacy]` to enable)")
 
 print("\nReports tutorial completed!")
 print(

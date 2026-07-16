@@ -8,7 +8,7 @@ from calm_data_generator.generators.tabular.RealGenerator import RealGenerator
 def test_latent_differentiation_shifts_embeddings():
     """Test that applying a differentiation factor physically moves class centroids apart in latent space."""
     np.random.seed(42)
-    generator = RealGenerator(random_state=42)
+    generator = RealGenerator(random_state=42, auto_report=False)
 
     # Create a very simple dataset with two classes that are slightly separated
     c0 = np.random.normal(0, 1, size=(50, 4))

@@ -31,6 +31,11 @@ from calm_data_generator.generators.tabular import RealGenerator, QualityReporte
 - `clipping_mode` (str): `'strict'`, `'permissive'`, or `'none'` for handling output ranges.
 - `use_latent_sampling` (bool): For scVI, sample from real data latent space.
 
+**Simpler API — `fit()` / `sample()`:** sklearn-style alternative to `generate()` for the
+train-once-sample-many-times case: `RealGenerator().fit(df, method="cart").sample(1000)`.
+`sample()` reuses the fitted model without retraining. See
+[REAL_GENERATOR_REFERENCE.md](REAL_GENERATOR_REFERENCE.md#simpler-api-fit--sample).
+
 **Advanced Validation & Processing:**
 - `_apply_postprocess_distribution(self, synthetic_df, class_counts, target_col, ...)`: Intelligently resamples rows in a synthetic DataFrame to meet target class distributions while preserving correlations. Emits warnings if classes are missing. Used automatically by many models when `custom_distributions` is set.
 
@@ -137,12 +142,20 @@ from calm_data_generator.generators.utils.propagation import propagate_numeric_d
 Privacy features are integrated into the `QualityReporter`. You can assess quality and privacy using:
 
 ```python
-# Comprehensive Quality Report (including ARI metrics for class separability)
+# Comprehensive Quality Report — DCR, NNDR, and Singling-Out risk (if anonymeter installed)
 reporter.generate_comprehensive_report(..., privacy_check=True)
 
 # Standalone ARI calculation
 ari_scores = reporter.calculate_ari(real_df, synthetic_df, target_col="label")
+
+# Lightweight, in-memory fidelity check (no files written) — quality + statistical + TSTR,
+# does not include privacy metrics
+result = reporter.evaluate(real_df, synthetic_df, target_column="label")
 ```
+
+Singling-Out risk requires the optional `anonymeter` dependency (`pip install
+calm-data-generator[privacy]`); DCR/NNDR need no extra dependency. See
+[REPORTS_REFERENCE.md](REPORTS_REFERENCE.md#privacy-metrics-dcr-nndr-singling-out) for details.
 
 For differential privacy guarantees at generation time, use the `dpgan` or `pategan` synthesis methods via `RealGenerator.generate(method="dpgan", ...)` or `RealGenerator.generate(method="pategan", ...)`.
 
@@ -157,9 +170,14 @@ pip install calm-data-generator
 # Stream (River)
 pip install calm-data-generator[stream]
 
+# Singling-Out privacy risk (anonymeter)
+pip install calm-data-generator[privacy]
+
 # Full
 pip install calm-data-generator[full]
 ```
 
 > [!NOTE]
-> **Privacy Features**: Privacy assessment (DCR metrics) is now integrated into `QualityReporter`. Use `privacy_check=True` when generating reports.
+> **Privacy Features**: Privacy assessment (DCR, NNDR metrics — no extra dependency; Singling-Out
+> risk — requires `[privacy]`) is integrated into `QualityReporter`. Use `privacy_check=True`
+> when generating reports.

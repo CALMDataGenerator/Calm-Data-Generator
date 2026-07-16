@@ -14,6 +14,10 @@ class CopulaPreset(GeneratorPreset):
     """
 
     def generate(self, data, n_samples, **kwargs):
+        """Generate synthetic data with a fast Gaussian Copula synthesizer.
+
+        See ``GeneratorPreset.generate`` for the shared signature (data, n_samples, **kwargs).
+        """
         gen = RealGenerator(
             auto_report=kwargs.pop("auto_report", True), random_state=self.random_state
         )

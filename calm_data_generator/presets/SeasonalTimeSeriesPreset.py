@@ -32,6 +32,20 @@ class SeasonalTimeSeriesPreset(GeneratorPreset):
         amplitude: float = 1.0,
         **kwargs,
     ) -> pd.DataFrame:
+        """Generate seasonal time-series data (TimeGAN core + seasonal component injection).
+
+        Args:
+            data: Original dataset to learn from.
+            n_samples: Number of synthetic samples to generate.
+            time_col: Name of the time/index column.
+            seasonal_cols (List[str]): Columns on which to inject the seasonal pattern.
+            period (int): Length of the seasonal cycle (default 12).
+            amplitude (float): Amplitude of the seasonal component (default 1.0).
+            **kwargs: Overrides for configuration parameters.
+
+        Returns:
+            pd.DataFrame: The seasonal synthetic time-series dataset.
+        """
         """
         Args:
             period: The period of the seasonality (e.g., 12 for monthly).

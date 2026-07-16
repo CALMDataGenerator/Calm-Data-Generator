@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from calm_data_generator.generators.tabular.QualityReporter import QualityReporter
+from calm_data_generator.reports.QualityReporter import QualityReporter
 
 
 @pytest.fixture
@@ -105,3 +105,72 @@ def test_quality_reporter_minimal_vs_full(data_pair):
             assert os.path.exists(os.path.join(out_full, "report_results.json"))
         except Exception as e:
             pytest.skip(f"Full report failed (likely missing heavy dep): {e}")
+
+
+def test_dcr_privacy_includes_nndr(data_pair):
+    """DCR privacy metrics should also include NNDR (Nearest Neighbor Distance Ratio)."""
+    real, synth = data_pair
+    reporter = QualityReporter(verbose=False)
+
+    metrics = reporter._calculate_dcr_privacy(real, synth)
+
+    assert metrics is not None
+    assert "dcr_mean" in metrics
+    assert "nndr_mean" in metrics
+    assert "nndr_5th_percentile" in metrics
+    # NNDR is a ratio of two distances, bounded in [0, 1]
+    assert 0.0 <= metrics["nndr_mean"] <= 1.0
+    assert 0.0 <= metrics["nndr_5th_percentile"] <= 1.0
+
+
+def test_singling_out_risk_returns_none_without_anonymeter(data_pair, monkeypatch):
+    """_calculate_singling_out_risk should degrade to None (not raise) if anonymeter is missing."""
+    import sys
+    real, synth = data_pair
+    reporter = QualityReporter(verbose=False)
+
+    monkeypatch.setitem(sys.modules, "anonymeter", None)
+    monkeypatch.setitem(sys.modules, "anonymeter.evaluators", None)
+
+    result = reporter._calculate_singling_out_risk(real, synth)
+    assert result is None
+
+
+def test_singling_out_risk_with_anonymeter(data_pair):
+    """When anonymeter is installed, singling-out risk should return a bounded risk value."""
+    pytest.importorskip("anonymeter")
+    real, synth = data_pair
+    reporter = QualityReporter(verbose=False)
+
+    result = reporter._calculate_singling_out_risk(
+        real, synth, n_attacks=10, max_attempts=2000
+    )
+
+    assert result is not None
+    assert "risk" in result
+    assert 0.0 <= result["risk"] <= 1.0
+    assert "ci_low" in result and "ci_high" in result
+    assert result["used_control"] is False
+
+
+def test_singling_out_risk_never_hangs_on_low_cardinality_duplicate_data():
+    """Regression test: anonymeter's own max_attempts default (10M) can hang for minutes
+    on low-cardinality/duplicate data. Our bounded default must keep this fast."""
+    import time
+    pytest.importorskip("anonymeter")
+
+    np.random.seed(0)
+    n = 100
+    real = pd.DataFrame({
+        "a": np.random.normal(0, 1, n),
+        "b": np.random.randint(0, 3, n),  # low cardinality
+    })
+    synth = real.copy()  # worst case: exact duplicate
+
+    reporter = QualityReporter(verbose=False)
+    start = time.time()
+    result = reporter._calculate_singling_out_risk(real, synth, n_attacks=20, max_attempts=3000)
+    elapsed = time.time() - start
+
+    assert elapsed < 30, f"Singling-Out risk took {elapsed:.1f}s — max_attempts bound may be broken"
+    assert result is not None

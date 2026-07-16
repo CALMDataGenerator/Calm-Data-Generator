@@ -14,6 +14,16 @@ class ScenarioInjectorPreset(GeneratorPreset):
     """
 
     def generate(self, data, scenario_config, **kwargs):
+        """Apply a scenario configuration to existing data via the ScenarioInjector.
+
+        Args:
+            data: The dataset to transform.
+            scenario_config: Scenario configuration (feature evolution / target construction).
+            **kwargs: Overrides for configuration parameters.
+
+        Returns:
+            pd.DataFrame: The transformed dataset.
+        """
         injector = ScenarioInjector(seed=self.random_state)
 
         if self.verbose:

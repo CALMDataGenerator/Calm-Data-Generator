@@ -309,7 +309,10 @@ pip install "calm-data-generator[stream]"
 # Predicción de perturbaciones con GEARS (requiere wheels de PyG — ver abajo)
 pip install "calm-data-generator[gears]"
 
-# Suite completa (stream + gears)
+# Métrica de riesgo de privacidad Singling-Out (anonymeter)
+pip install "calm-data-generator[privacy]"
+
+# Suite completa (stream + gears + privacy)
 pip install "calm-data-generator[full]"
 ```
 
@@ -410,6 +413,21 @@ synthetic = gen.generate(
 )
 
 print(f"Generadas {len(synthetic)} muestras")
+```
+
+### API más simple: `fit()` / `sample()`
+
+Para el caso común — entrenar una vez, muestrear tantas veces como haga falta — usa la
+envoltura estilo sklearn:
+
+```python
+gen = RealGenerator(auto_report=False).fit(data, method="cart", target_col="label")
+
+lote_pequeno = gen.sample(100)
+lote_grande = gen.sample(10_000)   # reutiliza el modelo entrenado, sin reentrenar
+
+# El encadenado también funciona:
+sintetico = RealGenerator().fit(data, method="ctgan").sample(1000)
 ```
 
 ### Aceleración por GPU
@@ -544,6 +562,14 @@ reporter.generate_report(
 )
 # Informe guardado en ./quality_report/report.html
 # JSON de resultados (incluyendo compared_data_files) guardado en ./quality_report/report_results.json
+```
+
+Para una comprobación rápida en memoria sin escribir ningún archivo (scores de calidad, tests
+estadísticos KS/MMD/Wasserstein, y TSTR si pasas `target_column`), usa `evaluate()`:
+
+```python
+resultado = reporter.evaluate(real_data, synthetic, target_column="target")
+print(resultado["quality_scores"], resultado["statistical_metrics"])
 ```
 
 Para **datos single-cell**, activa la evaluación [scGFT](https://github.com/nasim23ea/scgft-evaluator) (métricas de preservación de manifold basadas en Transformadas de Fourier en Grafos):

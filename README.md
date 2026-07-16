@@ -317,7 +317,10 @@ pip install "calm-data-generator[stream]"
 # GEARS perturbation prediction (requires PyG wheels — see below)
 pip install "calm-data-generator[gears]"
 
-# Full suite (stream + gears)
+# Singling-Out privacy risk metric (anonymeter)
+pip install "calm-data-generator[privacy]"
+
+# Full suite (stream + gears + privacy)
 pip install "calm-data-generator[full]"
 ```
 
@@ -425,6 +428,20 @@ synthetic = gen.generate(
 )
 
 print(f"Generated {len(synthetic)} samples")
+```
+
+### Simpler API: `fit()` / `sample()`
+
+For the common case — train once, sample as many times as you want — use the sklearn-style wrapper:
+
+```python
+gen = RealGenerator(auto_report=False).fit(data, method="cart", target_col="label")
+
+small_batch = gen.sample(100)
+large_batch = gen.sample(10_000)   # reuses the fitted model, no retraining
+
+# Chaining works too:
+synthetic = RealGenerator().fit(data, method="ctgan").sample(1000)
 ```
 
 ### GPU Acceleration
@@ -607,6 +624,14 @@ reporter.generate_report(
 )
 # Report saved to ./quality_report/report.html
 # Results JSON (including compared_data_files) saved to ./quality_report/report_results.json
+```
+
+For a fast, in-memory check without writing any file (quality scores, KS/MMD/Wasserstein
+statistical tests, and TSTR if you pass a `target_column`), use `evaluate()` instead:
+
+```python
+result = reporter.evaluate(real_data, synthetic, target_column="target")
+print(result["quality_scores"], result["statistical_metrics"])
 ```
 
 For **single-cell data**, enable [scGFT](https://github.com/nasim23ea/scgft-evaluator) evaluation (Graph Fourier Transform-based manifold preservation metrics):

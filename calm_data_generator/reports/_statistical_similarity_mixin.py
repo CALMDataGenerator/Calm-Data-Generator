@@ -13,15 +13,14 @@ logger = logging.getLogger("QualityReporter")
 class _StatisticalSimilarityMixin:
     """Mixin providing statistical similarity tests for QualityReporter."""
 
-    def _run_statistical_tests(
+    def _compute_statistical_tests(
         self,
         real_df: pd.DataFrame,
         synthetic_df: pd.DataFrame,
-        output_dir: str,
     ) -> Optional[Dict[str, Any]]:
-        """MMD, KS per column, Levene variance test per column. Saves statistical_tests.html."""
+        """MMD, KS, Wasserstein and Levene variance test per numeric column. In-memory, no I/O."""
         try:
-            from scipy.stats import ks_2samp, levene
+            from scipy.stats import ks_2samp, levene, wasserstein_distance
         except ImportError:
             logger.warning("scipy required for statistical tests.")
             return None
@@ -41,12 +40,14 @@ class _StatisticalSimilarityMixin:
 
                 ks_stat, ks_p = ks_2samp(r, s)
                 lev_stat, lev_p = levene(r, s)
+                wasserstein = wasserstein_distance(r, s)
 
                 results_per_col[col] = {
                     "ks_statistic": round(float(ks_stat), 4),
                     "ks_pvalue": round(float(ks_p), 4),
                     "levene_statistic": round(float(lev_stat), 4),
                     "levene_pvalue": round(float(lev_p), 4),
+                    "wasserstein_distance": round(float(wasserstein), 4),
                     "var_real": round(float(np.var(r)), 4),
                     "var_synthetic": round(float(np.var(s)), 4),
                     "var_ratio": round(float(np.var(s) / np.var(r)) if np.var(r) > 0 else float("nan"), 4),
@@ -63,12 +64,23 @@ class _StatisticalSimilarityMixin:
             if self.verbose:
                 logger.info("Statistical tests — MMD: %.4f, columns tested: %d", mmd_score, len(results_per_col))
 
-            self._save_statistical_tests_html(output, output_dir)
             return output
 
         except Exception as e:
             logger.error("Statistical tests failed: %s", e)
             return None
+
+    def _run_statistical_tests(
+        self,
+        real_df: pd.DataFrame,
+        synthetic_df: pd.DataFrame,
+        output_dir: str,
+    ) -> Optional[Dict[str, Any]]:
+        """Computes statistical tests and saves statistical_tests.html."""
+        output = self._compute_statistical_tests(real_df, synthetic_df)
+        if output is not None:
+            self._save_statistical_tests_html(output, output_dir)
+        return output
 
     @staticmethod
     def _compute_mmd(X: np.ndarray, Y: np.ndarray, gamma: float = 1.0) -> float:
@@ -153,7 +165,7 @@ class _StatisticalSimilarityMixin:
             )
 
             path = os.path.join(output_dir, "statistical_tests.html")
-            fig.write_html(path, include_plotlyjs="cdn")
+            fig.write_html(path, include_plotlyjs=True)
             logger.info("Statistical tests report saved to: %s", path)
 
         except Exception as e:

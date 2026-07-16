@@ -108,6 +108,49 @@ class QualityReporter(
         """Wrapper for generate_comprehensive_report to satisfy BaseReporter contract."""
         return self.generate_comprehensive_report(*args, **kwargs)
 
+    def evaluate(
+        self,
+        real_df: pd.DataFrame,
+        synthetic_df: pd.DataFrame,
+        target_column: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Lightweight, in-memory fidelity evaluation — no files written.
+
+        Computes the same metrics as `generate_comprehensive_report` (SDMetrics quality
+        scores, statistical similarity tests, and TSTR if a target is given) without
+        writing any HTML or JSON to disk. Use this for programmatic checks (e.g. inside
+        a training loop or a test), and `generate_comprehensive_report` when you want the
+        full HTML dashboard.
+
+        Args:
+            real_df (pd.DataFrame): The original/real dataset.
+            synthetic_df (pd.DataFrame): The generated/synthetic dataset.
+            target_column (Optional[str]): If provided, also runs TSTR (Train Synthetic,
+                Test Real) for this column.
+
+        Returns:
+            Dict[str, Any]: {
+                "quality_scores": SDMetrics overall/weighted scores,
+                "statistical_metrics": MMD, KS, Wasserstein, Levene per numeric column,
+                "tstr_metrics": TSTR metrics (only if target_column is given), or None,
+            }
+        """
+        quality_scores = self._assess_quality_scores(real_df, synthetic_df)
+        statistical_metrics = self._compute_statistical_tests(real_df, synthetic_df)
+
+        tstr_metrics = None
+        if target_column:
+            tstr_result = self._compute_tstr(real_df, synthetic_df, target_column)
+            if tstr_result is not None:
+                tstr_metrics, _ = tstr_result
+
+        return {
+            "quality_scores": quality_scores,
+            "statistical_metrics": statistical_metrics,
+            "tstr_metrics": tstr_metrics,
+        }
+
     def generate_comprehensive_report(
         self,
         real_df: pd.DataFrame,
@@ -128,18 +171,31 @@ class QualityReporter(
         tstr: bool = False,
         spearman: bool = False,
         report_config: Optional[Union[ReportConfig, Dict]] = None,
-    ) -> None:
+    ) -> Dict[str, Any]:
         """
         Generates a comprehensive file-based report comparing real and synthetic data.
         Can use ReportConfig or individual arguments.
+
+        Merge semantics when both `report_config` and individual arguments are given:
+        - Non-boolean settings (target_column, block_column, focus_cols, time_col,
+          resample_rule, constraints_stats, minimal, use_scgft) come from `report_config`;
+          the individual arguments are only used to build `report_config` when it is not
+          passed at all.
+        - Boolean feature flags (privacy_check, discriminator, tstr, spearman) and
+          `output_dir` use OR semantics: an explicitly-True/non-default argument always
+          wins, even if `report_config` says otherwise. This avoids silently dropping a
+          flag the caller explicitly asked for.
+
+        Returns:
+            Dict[str, Any]: The same results dict written to report_results.json
+            (quality scores, statistical tests, TSTR, privacy, ARI, etc.).
         """
         # Resolve Configuration
-        # Defaults if not provided in args
         if report_config:
             if isinstance(report_config, dict):
                 report_config = ReportConfig(**report_config)
         else:
-            # Create from args
+            # Build config from individual arguments
             report_config = ReportConfig(
                 output_dir=output_dir,
                 target_column=target_column,
@@ -151,16 +207,14 @@ class QualityReporter(
                 privacy_check=privacy_check,
                 minimal=minimal if minimal is not None else self.minimal,
                 discriminator=discriminator,
+                tstr=tstr,
+                spearman=spearman,
                 auto_report=True,  # implied
             )
 
-        # Override config with explicit non-None args (if mixed usage)
-        # But for simplicity, let's assume if report_config is passed, it is the source of truth,
-        # unless args are explicitly provided to override?
-        # A simple merge approach:
-        if (
-            output_dir != report_config.output_dir and output_dir != "output"
-        ):  # "output" is default
+        # Explicit non-default arguments always win for output_dir and boolean flags,
+        # even when a report_config was also passed (see merge semantics above).
+        if output_dir != report_config.output_dir and output_dir != "output":
             report_config.output_dir = output_dir
 
         # Use config values
@@ -171,14 +225,12 @@ class QualityReporter(
         time_col = report_config.time_col
         resample_rule = report_config.resample_rule
         constraints_stats = report_config.constraints_stats
-        privacy_check = report_config.privacy_check
+        privacy_check = report_config.privacy_check or privacy_check
         use_minimal = report_config.minimal
-        discriminator = report_config.discriminator
+        discriminator = report_config.discriminator or discriminator
+        tstr = report_config.tstr or tstr
+        spearman = report_config.spearman or spearman
         use_scgft = report_config.use_scgft
-
-        # Force minimal override if self.minimal is explicitly True?
-        # If config says False but self.minimal is True...
-        # Let's say config wins for this execution.
 
         if self.verbose:
             logger.info(
@@ -214,6 +266,8 @@ class QualityReporter(
         tstr_metrics = None
         if tstr and target_column:
             tstr_metrics = self._run_tstr(real_df, synthetic_df, target_column, output_dir)
+        elif tstr and not target_column:
+            logger.warning("tstr=True but no target_column was given; TSTR skipped.")
 
         # === Statistical Tests (MMD, KS, Levene) ===
         statistical_metrics = self._run_statistical_tests(real_df_for_report, synthetic_df_for_report, output_dir)
@@ -284,6 +338,8 @@ class QualityReporter(
         if self.verbose:
             logger.info("Report generated at: %s", output_dir)
 
+        return results
+
     def _run_quality_assessment(
         self,
         real_df: pd.DataFrame,
@@ -314,6 +370,13 @@ class QualityReporter(
         privacy_metrics = None
         if privacy_check or "dp" in generator_name.lower():
             privacy_metrics = self._calculate_dcr_privacy(real_df, synthetic_df)
+            # Singling-Out risk (anonymeter) is optional — None if the dependency
+            # isn't installed. Nested under its own key so it never disturbs the
+            # existing DCR/NNDR fields at the top level.
+            singling_out = self._calculate_singling_out_risk(real_df, synthetic_df)
+            if singling_out is not None:
+                privacy_metrics = privacy_metrics or {}
+                privacy_metrics["singling_out"] = singling_out
 
         if "overall_quality_score" in sdmetrics_quality:
             if self.verbose:

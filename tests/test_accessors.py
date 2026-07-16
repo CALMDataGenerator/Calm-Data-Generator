@@ -7,7 +7,7 @@ from calm_data_generator.generators.tabular.RealGenerator import RealGenerator
 
 def test_tvae_accessors():
     """Test that TVAE accessors return appropriate objects."""
-    generator = RealGenerator(random_state=42)
+    generator = RealGenerator(random_state=42, auto_report=False)
     # Simple dataset
     df = pd.DataFrame({
         "feature1": np.random.randn(100),
@@ -49,7 +49,7 @@ def test_tvae_accessors():
 
 def test_ctgan_accessors():
     """Test that CTGAN accessors return appropriate objects."""
-    generator = RealGenerator(random_state=42)
+    generator = RealGenerator(random_state=42, auto_report=False)
     df = pd.DataFrame({
         "feature1": np.random.randn(100),
         "feature2": np.random.randn(100),
@@ -91,7 +91,7 @@ def test_ctgan_accessors():
 
 def test_rtvae_accessors():
     """Test that RTVAE accessors return encoder and decoder."""
-    generator = RealGenerator(random_state=42)
+    generator = RealGenerator(random_state=42, auto_report=False)
     df = pd.DataFrame({
         "feature1": np.random.randn(100),
         "feature2": np.random.randn(100),

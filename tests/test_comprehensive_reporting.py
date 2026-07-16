@@ -1,8 +1,9 @@
-import pandas as pd
-import numpy as np
 import os
-import pytest
 import tempfile
+
+import numpy as np
+import pandas as pd
+import pytest
 from sklearn.datasets import load_iris
 
 
@@ -25,8 +26,8 @@ def output_base():
 
 def test_real_generator_drift_reporting(real_df, output_base):
     """Test RealGenerator with drift_injection_config report generation."""
-    from calm_data_generator.generators.tabular.RealGenerator import RealGenerator
     from calm_data_generator.generators.configs import DriftConfig
+    from calm_data_generator.generators.tabular.RealGenerator import RealGenerator
 
     output_dir = os.path.join(output_base, "1_real_generator_drift")
     gen = RealGenerator(auto_report=True)
@@ -62,7 +63,7 @@ def test_real_generator_drift_reporting(real_df, output_base):
 def test_drift_injector_standalone_reporting(real_df, output_base):
     """Test DriftInjector standalone report generation."""
     from calm_data_generator.generators.drift.DriftInjector import DriftInjector
-    from calm_data_generator.generators.tabular.QualityReporter import QualityReporter
+    from calm_data_generator.reports.QualityReporter import QualityReporter
 
     output_dir = os.path.join(output_base, "2_drift_injector")
     os.makedirs(output_dir, exist_ok=True)
@@ -81,6 +82,7 @@ def test_drift_injector_standalone_reporting(real_df, output_base):
         columns=column_to_drift,
         drift_type="shift",
         magnitude=0.5,
+        auto_report=False,  # the QualityReporter call below is the report under test
     )
 
     reporter = QualityReporter()
@@ -106,7 +108,7 @@ def test_scenario_injector_evolution_report(real_df, output_base):
     from calm_data_generator.generators.dynamics.ScenarioInjector import (
         ScenarioInjector,
     )
-    from calm_data_generator.generators.tabular.QualityReporter import QualityReporter
+    from calm_data_generator.reports.QualityReporter import QualityReporter
 
     output_dir = os.path.join(output_base, "3_scenario_injector")
     os.makedirs(output_dir, exist_ok=True)

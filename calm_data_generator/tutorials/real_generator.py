@@ -6,8 +6,9 @@ This tutorial demonstrates how to use RealGenerator to create
 synthetic data that preserves the statistical properties of real data.
 """
 
-import pandas as pd
 import numpy as np
+import pandas as pd
+
 from calm_data_generator import RealGenerator
 from calm_data_generator.generators.configs import DriftConfig, ReportConfig
 
@@ -198,3 +199,22 @@ try:
     print("\nFourierFlows synthetic data:", synthetic_fflows.shape)
 except Exception as e:
     print(f"FourierFlows not available: {e}")
+
+# ============================================================
+# 8. Simpler API - fit() / sample()
+# ============================================================
+
+# For the common case — train once, sample as many times as you want — use the
+# sklearn-style wrapper instead of calling generate() repeatedly. fit() trains the
+# model (no report/dataset written to disk); sample() reuses the fitted model
+# without retraining, however many times you call it.
+gen_fit = RealGenerator(auto_report=False, random_state=42)
+gen_fit.fit(data, method="cart", target_col="target")
+
+small_batch = gen_fit.sample(50)
+large_batch = gen_fit.sample(500)  # no retraining — same fitted model
+print("\nfit()/sample() — small batch:", small_batch.shape, "| large batch:", large_batch.shape)
+
+# Chaining works too:
+synthetic_chained = RealGenerator(auto_report=False).fit(data, method="cart").sample(100)
+print("Chained fit().sample():", synthetic_chained.shape)

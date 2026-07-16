@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "calm-data-generator"
-version = "2.2.1"
+version = "2.3.0"
 description = "CALM-Data-Generator: A Python library for synthetic data generation with support for drift injection and clinical data."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -78,8 +78,14 @@ gears = [
     "cell-gears>=0.1.2,<0.2.0",
 ]
 
+# anonymeter (MIT) powers the Singling-Out privacy risk metric in QualityReporter.
+# Optional: DCR/NNDR privacy metrics work without it.
+privacy = [
+    "anonymeter>=1.0.0,<2.0.0",
+]
+
 full = [
-    "calm-data-generator[stream,gears]",
+    "calm-data-generator[stream,gears,privacy]",
 ]
 
 [tool.ruff]

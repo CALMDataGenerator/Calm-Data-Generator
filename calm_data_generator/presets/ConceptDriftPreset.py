@@ -15,6 +15,18 @@ class ConceptDriftPreset(GeneratorPreset):
     """
 
     def generate(self, data, n_samples, target_col, drift_magnitude=0.5, **kwargs):
+        """Generate data with concept drift (shifted/inverted target relationship) via CTGAN.
+
+        Args:
+            data: Original dataset to learn from.
+            n_samples: Number of synthetic samples to generate.
+            target_col: Target column whose relationship with the features is drifted.
+            drift_magnitude (float): Strength of the concept drift (default 0.5).
+            **kwargs: Overrides for configuration parameters.
+
+        Returns:
+            pd.DataFrame: The synthetic dataset with injected concept drift.
+        """
         # Configuration to invert or shift the target relationship
         drift_conf = [
             {

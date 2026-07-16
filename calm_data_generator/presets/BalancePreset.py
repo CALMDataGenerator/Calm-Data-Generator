@@ -21,6 +21,17 @@ class BalancedDataGeneratorPreset(GeneratorPreset):
     def generate(
         self, data: pd.DataFrame, n_samples: int, target_col: str, **kwargs
     ) -> pd.DataFrame:
+        """Balance the target classes using SMOTE oversampling.
+
+        Args:
+            data: Original (imbalanced) dataset to learn from.
+            n_samples: Number of synthetic samples to generate.
+            target_col: Target column whose classes are balanced.
+            **kwargs: Overrides for configuration parameters.
+
+        Returns:
+            pd.DataFrame: The class-balanced synthetic dataset.
+        """
         gen = RealGenerator(
             auto_report=kwargs.pop("auto_report", False), random_state=self.random_state
         )

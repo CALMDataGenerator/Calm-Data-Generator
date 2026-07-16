@@ -14,6 +14,18 @@ class GradualDriftPreset(GeneratorPreset):
     """
 
     def generate(self, data, n_samples, drift_cols, slope=0.01, **kwargs):
+        """Generate data with gradual (linear-trend) drift on selected columns via CTGAN.
+
+        Args:
+            data: Original dataset to learn from.
+            n_samples: Number of synthetic samples to generate.
+            drift_cols: Columns on which to apply the gradual linear drift.
+            slope (float): Per-step slope of the linear drift trend (default 0.01).
+            **kwargs: Overrides for configuration parameters.
+
+        Returns:
+            pd.DataFrame: The synthetic dataset with gradual drift.
+        """
         drift_conf = []
         for col in drift_cols:
             drift_conf.append(

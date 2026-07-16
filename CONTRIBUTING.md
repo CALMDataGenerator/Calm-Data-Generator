@@ -24,7 +24,11 @@ We actively welcome your pull requests.
 1.  **Fork** the repo and create your branch from `main`.
 2.  If you've added code that should be tested, add tests.
 3.  Ensure your code passes linting (`ruff`).
-4.  Issue that pull request!
+4.  **If you edited a documentation file that has an EN/ES pair** (e.g. `README.md` /
+    `README_ES.md`, or any file under `calm_data_generator/docs/`), **update both in the
+    same PR.** CI will post a non-blocking warning if it detects a one-sided edit — treat
+    it as a reminder, not a hard requirement, but keeping both versions in sync is expected.
+5.  Issue that pull request!
 
 ## Development Setup
 

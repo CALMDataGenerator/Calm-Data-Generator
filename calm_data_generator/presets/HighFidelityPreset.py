@@ -23,6 +23,16 @@ class HighFidelityPreset(GeneratorPreset):
         n_samples: int,
         auto_report: bool = True,
     ) -> pd.DataFrame:
+        """Generate high-fidelity synthetic data with adversarial-validation quality checks.
+
+        Args:
+            data: Original dataset to learn from.
+            n_samples: Number of synthetic samples to generate.
+            auto_report (bool): If True, generate a quality report after synthesis (default True).
+
+        Returns:
+            pd.DataFrame: The high-fidelity synthetic dataset.
+        """
         gen = RealGenerator(auto_report=auto_report, random_state=self.random_state)
 
         # Default high-fidelity configuration

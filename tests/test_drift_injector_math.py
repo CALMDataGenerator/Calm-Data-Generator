@@ -67,7 +67,7 @@ def test_drift_math_validation(base_df):
 
 def test_drift_profiles(base_df):
     """Test window functions generation."""
-    injector = DriftInjector()
+    injector = DriftInjector(auto_report=False)
     rows = base_df.index
 
     # Linear profile

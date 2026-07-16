@@ -20,6 +20,19 @@ class TimeSeriesPreset(GeneratorPreset):
     def generate(
         self, data, n_samples, sequence_key, time_key=None, method="timegan", **kwargs
     ):
+        """Generate time-series data preserving temporal correlations.
+
+        Args:
+            data: Original dataset to learn from.
+            n_samples: Number of synthetic samples to generate.
+            sequence_key: Column identifying each sequence/entity.
+            time_key: Optional column marking time ordering within a sequence.
+            method (str): Time-series synthesis method (default "timegan").
+            **kwargs: Overrides for configuration parameters.
+
+        Returns:
+            pd.DataFrame: The synthetic time-series dataset.
+        """
         gen = RealGenerator(
             auto_report=kwargs.pop("auto_report", True), random_state=self.random_state
         )

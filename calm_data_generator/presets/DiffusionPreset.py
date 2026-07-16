@@ -16,6 +16,10 @@ class DiffusionPreset(GeneratorPreset):
     """
 
     def generate(self, data: pd.DataFrame, n_samples: int, **kwargs) -> pd.DataFrame:
+        """Generate high-quality synthetic data with a diffusion model (TabDDPM).
+
+        See ``GeneratorPreset.generate`` for the shared signature (data, n_samples, **kwargs).
+        """
         gen = RealGenerator(
             auto_report=kwargs.pop("auto_report", True), random_state=self.random_state
         )

@@ -21,13 +21,22 @@ The `calm_data_generator` library includes a suite of reporting tools designed t
 | `time_col` | str | `None` | Time column for time-series analysis |
 | `block_column` | str | `None` | Block identifier column for block-based data |
 | `resample_rule` | str/int | `None` | Resampling rule for time-series (e.g., `"1D"`, `"1H"`) |
-| `privacy_check` | bool | `False` | Enable privacy assessment (DCR metrics) |
-| `adversarial_validation` | bool | `False` | Enable discriminator-based validation |
+| `privacy_check` | bool | `False` | Enable privacy assessment — DCR, NNDR, and Singling-Out risk (if `anonymeter` is installed) |
+| `discriminator` | bool | `False` | Enable discriminator-based (adversarial validation) reporting |
+| `tstr` | bool | `False` | Run TSTR (Train Synthetic, Test Real) — requires `target_column` |
+| `spearman` | bool | `False` | Generate Spearman correlation heatmaps (real vs. synthetic) |
 | `focus_columns` | List[str] | `None` | Specific columns to focus analysis on |
 | `constraints_stats` | Dict[str, int] | `None` | Constraint violation statistics |
 | `sequence_config` | Dict | `None` | Configuration for sequence-based analysis |
 | `per_block_external_reports` | bool | `False` | Generate separate reports per block |
 | `use_scgft` | bool | `False` | Enable specialized scGFT single-cell evaluation |
+
+> [!NOTE]
+> When both `report_config` and individual keyword arguments are passed to
+> `generate_comprehensive_report()`, `discriminator`/`privacy_check`/`tstr`/`spearman` use OR
+> semantics — an explicitly-set argument always wins, even if `report_config` leaves it at its
+> default. Other fields (e.g. `target_column`, `minimal`) come from `report_config` when it is
+> provided.
 
 ### Usage Examples
 
@@ -80,27 +89,61 @@ report_config = ReportConfig(
 Generates comprehensive reports comparing real and synthetic tabular data.
 
 ### `generate_comprehensive_report`
-Generates a static report including:
-- **Overall Quality Scores**: Overall and column-wise similarity metrics.
-- **Privacy Assessment**: Distance to Closest Record (DCR) metrics.
-- **Visualizations**: Histograms, density plots, PCA/UMAP projections.
+Generates a static, file-based report (HTML + `report_results.json`) including:
+- **Overall Quality Scores**: Overall and column-wise similarity metrics (SDMetrics).
+- **Statistical Similarity**: KS test, Levene test, Wasserstein distance (per numeric column),
+  and MMD (global), saved to `statistical_tests.html`.
+- **Privacy Assessment** (`privacy_check=True`): Distance to Closest Record (DCR), Nearest
+  Neighbor Distance Ratio (NNDR), and Singling-Out risk (if the optional `anonymeter` dependency
+  is installed — see the [Privacy Metrics](#privacy-metrics-dcr-nndr-singling-out) section below).
+- **ML Utility (TSTR)** (`tstr=True`, requires `target_column`): Train-Synthetic-Test-Real
+  metrics, saved to `tstr_report.html`.
+- **Visualizations**: Histograms, density plots, QQ plots, PCA/UMAP projections, Spearman
+  correlation heatmaps (`spearman=True`).
 - **ARI Metrics (Class Separability)**: Adjusted Rand Index (ARI) using K-Means (k=2) to quantify how well classes (Cases vs Controles) are separated in both real and synthetic data.
 - **Drift Analysis**: Visual comparison of feature distributions.
+
+Since v2.3.0, this method **returns the results dict** (the same one written to
+`report_results.json`) instead of `None`.
 
 ```python
 from calm_data_generator.generators.configs import ReportConfig
 
 reporter = QualityReporter(verbose=True)
-reporter.generate_comprehensive_report(
+results = reporter.generate_comprehensive_report(
     real_df=original_df,
     synthetic_df=synthetic_df,
     generator_name="MyGenerator",
     report_config=ReportConfig(
         output_dir="./report_output",
-        target_column="target_col"
+        target_column="target_col",
+        privacy_check=True,
+        tstr=True,
     )
 )
+print(results["quality_scores"], results["statistical_metrics"])
 ```
+
+### `evaluate()` — lightweight, in-memory check
+
+For a fast fidelity check without writing anything to disk (e.g. inside a training loop, a
+test, or a quick sanity check), use `evaluate()` instead:
+
+```python
+reporter = QualityReporter(verbose=False)
+result = reporter.evaluate(real_df, synthetic_df, target_column="target")
+# {
+#   "quality_scores": {"overall_quality_score": 0.94, "weighted_quality_score": 0.93},
+#   "statistical_metrics": {"mmd": 0.012, "per_column": {...}},   # includes Wasserstein per column
+#   "tstr_metrics": {"task": "classification", "roc_auc": 0.91, ...},  # None if no target_column
+# }
+```
+
+`evaluate()` computes SDMetrics quality scores, statistical similarity tests (KS/Levene/MMD/
+Wasserstein), and TSTR (if `target_column` is given) — the same underlying computations as
+`generate_comprehensive_report()`, but it writes no HTML/JSON and doesn't require `output_dir`.
+It does **not** compute privacy metrics (DCR/NNDR/Singling-Out) — those remain file-report-only
+via `privacy_check=True`, since Singling-Out risk in particular can take several seconds.
 
 ### `calculate_quality_metrics`
 Calculates quality metrics (SDMetrics) for two datasets without generating a full report.
@@ -108,7 +151,7 @@ Calculates quality metrics (SDMetrics) for two datasets without generating a ful
 ```python
 reporter = QualityReporter(verbose=False)
 metrics = reporter.calculate_quality_metrics(
-    real_df=df1, 
+    real_df=df1,
     synthetic_df=df2
 )
 # Returns: {'overall_quality_score': 0.85, 'weighted_quality_score': 0.82}
@@ -119,12 +162,50 @@ Standalone calculation of Adjusted Rand Index (ARI) to quantify class separabili
 
 ```python
 ari_metrics = reporter.calculate_ari(
-    real_df=df1, 
+    real_df=df1,
     synthetic_df=df2,
     target_col="label"
 )
 # Returns: {'ari_original': 0.95, 'ari_synthetic': 0.98, 'ari_improvement': 0.03}
 ```
+
+## Privacy Metrics (DCR, NNDR, Singling-Out)
+
+Enabled by `privacy_check=True` in `generate_comprehensive_report()`. Results land under the
+`privacy_metrics` key of the returned/saved results dict.
+
+- **DCR (Distance to Closest Record)**: Euclidean distance (on normalized numeric columns) from
+  each synthetic record to its closest real record. Lower values mean the synthetic record sits
+  closer to a real one — a raw, scale-dependent proximity signal.
+  - `dcr_mean`, `dcr_5th_percentile`
+- **NNDR (Nearest Neighbor Distance Ratio)**: ratio of the distance to the closest real record
+  over the distance to the second-closest one. A ratio near 0 means a synthetic record is much
+  closer to one specific real record than to any other (higher re-identification risk); near 1
+  means it's roughly equidistant to several real records (lower risk). Scale-invariant,
+  complements DCR.
+  - `nndr_mean`, `nndr_5th_percentile`
+- **Singling-Out risk**: via the optional [anonymeter](https://github.com/statice/anonymeter)
+  (MIT) dependency — `pip install calm-data-generator[privacy]`. Estimates the risk that an
+  attacker can isolate one real record using a combination of attributes learned from the
+  synthetic data. Nested under `privacy_metrics["singling_out"]`; `None` (with an info-level
+  log, not an error) if `anonymeter` isn't installed.
+  - `risk` (0–1, higher = riskier), `ci_low`/`ci_high` (95% confidence interval), `used_control`
+
+```python
+results = reporter.generate_comprehensive_report(
+    real_df, synthetic_df, "MyGenerator", "./out", privacy_check=True,
+)
+pm = results["privacy_metrics"]
+print(pm["dcr_mean"], pm["nndr_mean"])
+print(pm.get("singling_out"))  # None if anonymeter isn't installed
+```
+
+> [!NOTE]
+> anonymeter's own retry limit for finding unique attack queries defaults to 10,000,000, which
+> can take minutes on low-cardinality/duplicate-heavy data. `calm-data-generator` bounds this to
+> a much lower default internally, so a report run never blocks on it — at the cost of a wider
+> confidence interval on pathological data. Call `reporter._calculate_singling_out_risk(...)`
+> directly if you need to tune `n_attacks`/`n_cols`/`max_attempts`.
 
 ## Discriminator Reporter (Adversarial Validation)
 **Module:** `calm_data_generator.reports.DiscriminatorReporter`
@@ -250,4 +331,3 @@ Every report generates a `report_results.json` file containing the raw metrics:
 
 > [!NOTE]
 > **Privacy Reporting**: Privacy features (DCR metrics) are now integrated into `QualityReporter`. Use `privacy_check=True` when generating reports.
-

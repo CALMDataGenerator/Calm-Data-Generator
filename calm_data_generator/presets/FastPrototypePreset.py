@@ -14,6 +14,10 @@ class FastPrototypePreset(GeneratorPreset):
     """
 
     def generate(self, data, n_samples, **kwargs):
+        """Generate synthetic data quickly (LightGBM, minimal reporting) for prototyping.
+
+        See ``GeneratorPreset.generate`` for the shared signature (data, n_samples, **kwargs).
+        """
         # Uses LightGBM for speed, minimal reporting
         gen = RealGenerator(
             auto_report=kwargs.pop("auto_report", False),

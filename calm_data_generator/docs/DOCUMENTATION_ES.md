@@ -113,6 +113,7 @@ pip install calm-data-generator
 | Extra | Comando | Incluye |
 |-------|---------|---------|
 | stream | `pip install "calm-data-generator[stream]"` | River (streaming ML) |
+| privacy | `pip install "calm-data-generator[privacy]"` | anonymeter (riesgo de privacidad Singling-Out) |
 | full | `pip install "calm-data-generator[full]"` | Todas las dependencias anteriores |
 
 > [!NOTE]
@@ -140,6 +141,19 @@ from calm_data_generator.generators.tabular import RealGenerator
 gen = RealGenerator()
 synthetic_data = gen.generate(real_data, n_samples=1000, method='lgbm')
 ```
+
+### API más simple: `fit()` / `sample()`
+
+Para el caso común de entrenar una vez y muestrear repetidamente, usa la envoltura estilo sklearn:
+
+```python
+gen = RealGenerator(auto_report=False).fit(real_data, method="cart")
+
+muestra_1 = gen.sample(500)
+muestra_2 = gen.sample(5000)   # sin reentrenar
+```
+
+Ver [REAL_GENERATOR_REFERENCE_ES.md](REAL_GENERATOR_REFERENCE_ES.md#api-más-simple-fit--sample) para más detalle.
 
 ### Métodos Soportados
 
@@ -245,14 +259,26 @@ Ver [DRIFT_INJECTOR_REFERENCE_ES.md](./DRIFT_INJECTOR_REFERENCE_ES.md).
 
 Las características de privacidad ahora están disponibles a través de:
 
-1. **QualityReporter con métricas DCR**: Usa `privacy_check=True` para calcular métricas de Distance to Closest Record (DCR), que miden el riesgo de re-identificación.
+1. **QualityReporter con DCR/NNDR/Singling-Out**: Usa `privacy_check=True` para calcular
+   Distance to Closest Record (DCR) y Nearest Neighbor Distance Ratio (NNDR), que miden el
+   riesgo de re-identificación, más el riesgo de Singling-Out si la dependencia opcional
+   `anonymeter` (`pip install calm-data-generator[privacy]`) está instalada.
 
 ```python
 from calm_data_generator.generators.tabular import QualityReporter
 
 reporter = QualityReporter()
-reporter.generate_report(real_df, synthetic_df, privacy_check=True)
+results = reporter.generate_comprehensive_report(
+    real_df, synthetic_df, "MyGenerator", "./output", privacy_check=True,
+)
+print(results["privacy_metrics"])  # dcr_mean, nndr_mean, singling_out (si anonymeter instalado)
 ```
+
+Para una comprobación rápida en memoria sin escribir archivos, usa `reporter.evaluate(real_df,
+synthetic_df, target_column="target")` (nota: `evaluate()` no incluye métricas de privacidad,
+solo `generate_comprehensive_report()` las calcula). Ver
+[REPORTS_REFERENCE_ES.md](REPORTS_REFERENCE_ES.md#métricas-de-privacidad-dcr-nndr-singling-out)
+para la referencia completa.
 
 2. **Modelos de Privacidad Diferencial de Synthcity**: Algunos plugins de Synthcity soportan privacidad diferencial de forma nativa. Consulta la documentación de Synthcity para más detalles.
 

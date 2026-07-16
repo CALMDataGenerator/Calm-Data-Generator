@@ -19,6 +19,16 @@ class RareDiseasePreset(GeneratorPreset):
     def generate(
         self, n_samples: int, disease_ratio: float = 0.01, **kwargs
     ) -> Dict[str, pd.DataFrame]:
+        """Generate clinical data with a rare-disease (highly imbalanced) case/control ratio.
+
+        Args:
+            n_samples: Number of patients to generate.
+            disease_ratio (float): Proportion of disease cases, e.g. 0.01 = 1% (default 0.01).
+            **kwargs: Overrides for configuration parameters.
+
+        Returns:
+            Dict[str, pd.DataFrame]: The clinical dataset(s) (clinical, omics, etc.).
+        """
         gen = ClinicalDataGenerator(
             auto_report=kwargs.pop("auto_report", True), seed=self.random_state
         )

@@ -97,6 +97,11 @@ class _GeneratePipelineMixin:
             # Construct from legacy args
             from calm_data_generator.generators.configs import DateConfig
 
+            self.logger.warning(
+                "generate(date_start=..., date_every=..., date_step=...) is a legacy "
+                "shorthand. Prefer generate(date_config=DateConfig(start_date=..., "
+                "frequency=..., step=..., date_col=...)) instead."
+            )
             date_config = DateConfig(
                 start_date=date_start,
                 frequency=date_every,
@@ -117,6 +122,10 @@ class _GeneratePipelineMixin:
         """Merges the legacy `custom_distribution` alias, validates, and applies `balance`."""
         # Merge shorthand aliases into canonical params
         if custom_distribution:
+            self.logger.warning(
+                "generate(custom_distribution=...) (singular) is a legacy alias. "
+                "Prefer generate(custom_distributions=...) (plural) instead."
+            )
             custom_distributions = custom_distribution if custom_distributions is None else {**custom_distribution, **custom_distributions}
 
         if custom_distributions:

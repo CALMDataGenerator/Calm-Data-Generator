@@ -142,6 +142,8 @@ class ReportConfig(BaseModel):
     resample_rule: Optional[Union[str, int]] = None
     privacy_check: bool = False
     discriminator: bool = False
+    tstr: bool = False
+    spearman: bool = False
     focus_columns: Optional[List[str]] = None
     constraints_stats: Optional[Dict[str, int]] = None
     sequence_config: Optional[Dict] = None

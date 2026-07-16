@@ -14,6 +14,10 @@ class DataQualityAuditPreset(GeneratorPreset):
     """
 
     def generate(self, data, n_samples, **kwargs):
+        """Generate data with TVAE and force a full quality report for auditing.
+
+        See ``GeneratorPreset.generate`` for the shared signature (data, n_samples, **kwargs).
+        """
         gen = RealGenerator(
             auto_report=True,  # Force True
             minimal_report=False,  # Force Full Report

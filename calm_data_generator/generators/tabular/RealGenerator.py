@@ -577,7 +577,25 @@ class RealGenerator(
         method_name: str = "custom",
         columns: Optional[List[str]] = None
     ) -> pd.DataFrame:
+        """
+        Generate synthetic data using a user-supplied (custom) model via a plugin adapter.
 
+        Wraps any external model in a CustomPluginAdapter, fits it on ``data`` and samples
+        ``n_samples`` rows from it. Useful to plug third-party synthesizers into the same API.
+
+        Args:
+            data (pd.DataFrame): The real dataset used to fit the custom model.
+            model: The custom model instance to wrap.
+            n_samples (int): Number of synthetic rows to generate.
+            fit_fn: Optional callable to fit the model. If None, the adapter uses its default.
+            generate_fn: Optional callable to sample from the model. If None, the adapter uses its default.
+            postprocess_fn: Optional callable applied to the generated output.
+            method_name (str): Label used for logging and metadata. Defaults to "custom".
+            columns (Optional[List[str]]): Columns to generate. Defaults to all columns in ``data``.
+
+        Returns:
+            pd.DataFrame: The generated synthetic DataFrame.
+        """
         from calm_data_generator.generators.tabular.CustomPluginAdapter import CustomPluginAdapter
 
 
@@ -631,6 +649,74 @@ class RealGenerator(
         delta: float = 1e-5,
         **kwargs,
     ) -> Optional[pd.DataFrame]:
+        """
+        The main public method to generate synthetic data.
+
+        This method has a large surface area because it dispatches to many different
+        synthesis methods (`method=...`), each with its own concerns (drift, dynamics,
+        privacy, reporting). Most calls only need `data`, `n_samples`, and `method`;
+        everything else is optional and grouped below by concern. For a simpler,
+        sklearn-style flow that separates training from sampling, see `.fit()`/`.sample()`.
+
+        Args:
+            data (Union[pd.DataFrame, AnnData]): The real dataset (DataFrame) or AnnData
+                object to be synthesized. If None, samples from a previously fitted/loaded
+                model instead of training (see `n_samples`).
+            n_samples (int): The number of synthetic samples to generate.
+            method (str): The synthesis method to use (e.g. "cart", "ctgan", "tvae", "gmm").
+            target_col (Optional[str]): The name of the target variable column.
+            block_column (Optional[str]): The name of the column defining data blocks.
+            cond (Optional[Any]): Conditional value(s) to bias generation towards, if the
+                method supports conditional sampling.
+            constraints (Optional[List[Dict]]): Hard constraints the output must satisfy
+                (e.g. value ranges, uniqueness). Violating rows are regenerated/dropped.
+            adversarial_validation (bool): If True, runs the DiscriminatorReporter to
+                compute adversarial validation metrics (AUC) alongside the report.
+            epsilon (Optional[float]): Differential-privacy budget. Only has an effect
+                with method="dpgan" or method="pategan".
+            delta (float): Differential-privacy delta, paired with `epsilon`.
+            **kwargs: Method-specific hyperparameters.
+                Common parameters:
+                - differentiation_factor (float): Enhances class separation in latent
+                  space (TVAE/scVI).
+                - clipping_mode (str): 'strict' (default), 'permissive', or 'none' for
+                  output range control.
+                - clipping_factor (float): Tolerance factor for 'permissive' clipping
+                  (default 0.1).
+                - use_latent_sampling (bool): For scVI, whether to sample from real
+                  data's latent space.
+
+            Drift & dynamics:
+                drift_injection_config (Optional[List[Dict]]): List of drift injection
+                    configurations, applied to the generated output.
+                dynamics_config (Optional[Dict]): Configuration for dynamics injection
+                    (feature evolution, target construction).
+
+            Reporting & output:
+                output_dir (Optional[str]): Directory to save the report and dataset.
+                    Optional if save_dataset is False and auto_report is False.
+                save_dataset (bool): If True, saves the generated dataset to a CSV file.
+                report_config (Optional[ReportConfig]): Structured report configuration
+                    (target_column, privacy_check, tstr, etc.) — an alternative to
+                    passing report-related args individually.
+
+            Distributions & balancing:
+                custom_distributions (Optional[Dict]): Per-column distribution overrides.
+                balance (bool): If True, balances the distribution of the target column.
+
+            Legacy shorthand aliases (prefer the modern equivalent — a `logger.warning`
+            is emitted when these are used):
+                custom_distribution (Optional[Dict]): Legacy alias for
+                    `custom_distributions` (singular vs. plural).
+                date_config (Optional[DateConfig]): Configuration for date injection.
+                    Prefer this over the four `date_*` args below.
+                date_start, date_every, date_step, date_col: Legacy shorthand for
+                    building a `DateConfig` inline. Prefer passing `date_config=
+                    DateConfig(start_date=..., frequency=..., step=..., date_col=...)`.
+
+        Returns:
+            Optional[pd.DataFrame]: The generated synthetic DataFrame, or None if synthesis fails.
+        """
         # BUGFIX: Reset history and active state at the start of each generation
         self.training_history = {}
         self._is_training_active = True
@@ -638,34 +724,6 @@ class RealGenerator(
         # Ensure reporter is fresh and respects the current minimal mode
         from calm_data_generator.reports.QualityReporter import QualityReporter
         self.reporter = QualityReporter(minimal=self.minimal_report)
-        """
-        The main public method to generate synthetic data.
-
-        Args:
-            data (Union[pd.DataFrame, AnnData]): The real dataset (DataFrame) or AnnData object to be synthesized.
-            n_samples (int): The number of synthetic samples to generate.
-            method (str): The synthesis method to use.
-            target_col (Optional[str]): The name of the target variable column.
-            block_column (Optional[str]): The name of the column defining data blocks.
-            output_dir (Optional[str]): Directory to save the report and dataset. Optional if save_dataset is False.
-            custom_distributions (Optional[Dict]): A dictionary to specify custom distributions for columns.
-            custom_distribution (Optional[Dict]): Alias for custom_distributions.
-            date_config (Optional[DateConfig]): Configuration for date injection.
-            balance (bool): If True, balances the distribution of the target column.
-            save_dataset (bool): If True, saves the generated dataset to a CSV file.
-            drift_injection_config (Optional[List[Dict]]): List of drift injection configurations.
-            dynamics_config (Optional[Dict]): Configuration for dynamics injection (feature evolution, target construction).
-            **kwargs: Hyperparameters for the models.
-                Common v1.2.0 parameters:
-                - differentiation_factor (float): Enhances class separation in latent space (TVAE/scVI).
-                - clipping_mode (str): 'strict' (default), 'permissive', or 'none' for output range control.
-                - clipping_factor (float): Tolerance factor for 'permissive' clipping (default 0.1).
-                - use_latent_sampling (bool): For scVI, whether to sample from real data's latent space.
-            adversarial_validation (bool): If True, runs the DiscriminatorReporter to compute adversarial validation metrics (AUC).
-
-        Returns:
-            Optional[pd.DataFrame]: The generated synthetic DataFrame, or None if synthesis fails.
-        """
         # Handle file paths as input
         if isinstance(data, str):
             import os
@@ -792,3 +850,71 @@ class RealGenerator(
             self.logger.error(f"Synthesis method '{method}' failed to generate data.")
             self._is_training_active = False
             return None
+
+    def fit(
+        self,
+        data: Union[pd.DataFrame, Any],
+        method: str = "cart",
+        target_col: Optional[str] = None,
+        **kwargs,
+    ) -> "RealGenerator":
+        """
+        Fit the generator on `data` (sklearn-style). Call `.sample(n_samples)` afterwards
+        to draw synthetic rows from the fitted model, as many times as you like, without
+        retraining.
+
+        This is a thin wrapper around `generate()`: it trains the model exactly the same
+        way, but discards the throwaway dataset produced during training and skips report
+        generation (no `output_dir` is used). For a one-shot call that trains and returns
+        a synthetic dataset in one step, use `generate()` directly instead.
+
+        Args:
+            data (Union[pd.DataFrame, AnnData]): The real dataset to fit the model on.
+            method (str): The synthesis method to use (see `generate()`). Defaults to "cart".
+            target_col (Optional[str]): The name of the target variable column, if any.
+            **kwargs: Any other keyword argument accepted by `generate()` (e.g.
+                custom_distributions, constraints, dynamics_config, differentiation_factor).
+
+        Returns:
+            RealGenerator: self, so calls can be chained, e.g. `gen.fit(df).sample(1000)`.
+        """
+        kwargs.pop("n_samples", None)
+        kwargs.pop("output_dir", None)
+        kwargs.pop("save_dataset", None)
+        try:
+            n_rows = len(data)
+        except TypeError:
+            n_rows = 100
+        fit_n_samples = max(1, min(n_rows, 500))
+
+        self.generate(
+            data=data,
+            n_samples=fit_n_samples,
+            method=method,
+            target_col=target_col,
+            save_dataset=False,
+            **kwargs,
+        )
+        return self
+
+    def sample(self, n_samples: int) -> pd.DataFrame:
+        """
+        Draw `n_samples` synthetic rows from a previously fitted model (sklearn-style).
+
+        Call `.fit(data)` first. Unlike `generate()`, this does not retrain — it reuses
+        the model fitted by the last `.fit()` (or `.load()`) call.
+
+        Args:
+            n_samples (int): Number of synthetic rows to generate.
+
+        Returns:
+            pd.DataFrame: The generated synthetic DataFrame.
+        """
+        if self.synthesizer is None:
+            raise ValueError(
+                "No fitted model found. Call `.fit(data)` (or `.load(path)`) before `.sample(n_samples)`."
+            )
+        result = self.generate(data=None, n_samples=n_samples)
+        if result is None:
+            raise RuntimeError("Sampling from the fitted model failed; check logs for details.")
+        return result

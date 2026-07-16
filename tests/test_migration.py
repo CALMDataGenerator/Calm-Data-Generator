@@ -2,8 +2,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from calm_data_generator.generators.tabular.QualityReporter import QualityReporter
 from calm_data_generator.generators.tabular.RealGenerator import RealGenerator
+from calm_data_generator.reports.QualityReporter import QualityReporter
 from calm_data_generator.reports.Visualizer import Visualizer
 
 
@@ -64,3 +64,35 @@ def test_real_generator_plugins():
     gen = RealGenerator()
     # Just init shouldn't crash
     assert gen is not None
+
+
+def test_presets_import_does_not_recurse():
+    """Regression test: `from calm_data_generator import presets` used to raise
+    RecursionError because the lazy-import map had a self-referential entry for the
+    `presets` subpackage (it tried to import itself to resolve itself)."""
+    from calm_data_generator import presets
+
+    assert hasattr(presets, "FastPreset")
+
+
+def test_real_generator_generate_has_runtime_docstring():
+    """Regression test: `generate()`'s docstring used to be written *after* executable
+    code, making it a dead string literal rather than an actual docstring (__doc__ was
+    None). Same bug existed in `generate_custom` and all preset `.generate()` methods."""
+    assert RealGenerator.generate.__doc__
+    assert RealGenerator.generate_custom.__doc__
+
+
+def test_all_presets_have_generate_docstring():
+    import inspect
+
+    from calm_data_generator import presets
+
+    preset_classes = [
+        obj for name, obj in inspect.getmembers(presets, inspect.isclass)
+        if name.endswith("Preset") and obj.__module__.startswith("calm_data_generator.presets")
+    ]
+    assert len(preset_classes) >= 18  # sanity check we actually found the presets
+
+    missing = [cls.__name__ for cls in preset_classes if not cls.generate.__doc__]
+    assert missing == [], f"Presets with no generate() docstring: {missing}"

@@ -24,6 +24,17 @@ class DriftScenarioPreset(GeneratorPreset):
         drift_scenarios: List[Dict] = None,
         **kwargs,
     ) -> pd.DataFrame:
+        """Generate data with one or more injected drift scenarios via CTGAN.
+
+        Args:
+            data: Original dataset to learn from.
+            n_samples: Number of synthetic samples to generate.
+            drift_scenarios (List[Dict]): List of drift scenario configurations to inject.
+            **kwargs: Overrides for configuration parameters.
+
+        Returns:
+            pd.DataFrame: The synthetic dataset with injected drift.
+        """
         gen = RealGenerator(
             auto_report=kwargs.pop("auto_report", True), random_state=self.random_state
         )

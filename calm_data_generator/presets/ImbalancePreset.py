@@ -25,6 +25,18 @@ class ImbalancedGeneratorPreset(GeneratorPreset):
         imbalance_ratio: float = 0.1,
         **kwargs,
     ) -> pd.DataFrame:
+        """Generate class-imbalanced data via CTGAN with a target minority-class ratio.
+
+        Args:
+            data: Original dataset to learn from.
+            n_samples: Number of synthetic samples to generate.
+            target_col: Target column whose class balance is controlled.
+            imbalance_ratio (float): Desired minority-class proportion (default 0.1).
+            **kwargs: Overrides for configuration parameters.
+
+        Returns:
+            pd.DataFrame: The class-imbalanced synthetic dataset.
+        """
         gen = RealGenerator(
             auto_report=kwargs.pop("auto_report", False), random_state=self.random_state
         )

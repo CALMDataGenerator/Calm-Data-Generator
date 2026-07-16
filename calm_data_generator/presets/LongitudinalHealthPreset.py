@@ -13,6 +13,16 @@ class LongitudinalHealthPreset(GeneratorPreset):
     """
 
     def generate(self, n_samples, n_visits=5, **kwargs):
+        """Generate longitudinal clinical data across multiple patient visits.
+
+        Args:
+            n_samples: Number of patients to generate.
+            n_visits (int): Number of visits (time points) per patient (default 5).
+            **kwargs: Overrides for configuration parameters.
+
+        Returns:
+            pd.DataFrame or Dict: The longitudinal clinical dataset(s).
+        """
         gen = ClinicalDataGenerator(
             auto_report=kwargs.pop("auto_report", False), seed=self.random_state
         )

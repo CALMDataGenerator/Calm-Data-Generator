@@ -9,6 +9,10 @@ from .base import GeneratorPreset
 
 class SingleCellQualityPreset(GeneratorPreset):
     def generate(self, data: Any, n_samples: int, **kwargs) -> pd.DataFrame:
+        """Generate high-quality single-cell RNA-seq data with scVI.
+
+        See ``GeneratorPreset.generate`` for the shared signature (data, n_samples, **kwargs).
+        """
         gen = RealGenerator(
             auto_report=kwargs.pop("auto_report", True), random_state=self.random_state
         )

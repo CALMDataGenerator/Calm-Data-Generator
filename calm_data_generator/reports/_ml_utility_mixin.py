@@ -13,14 +13,20 @@ logger = logging.getLogger("QualityReporter")
 class _MLUtilityMixin:
     """Mixin providing TSTR (Train Synthetic, Test Real) ML utility metrics for QualityReporter."""
 
-    def _run_tstr(
+    def _compute_tstr(
         self,
         real_df: pd.DataFrame,
         synthetic_df: pd.DataFrame,
         target_col: str,
-        output_dir: str,
-    ) -> Optional[Dict[str, Any]]:
-        """Train on Synthetic, Test on Real. RF classifier or regressor depending on target dtype."""
+    ):
+        """Train on Synthetic, Test on Real. RF classifier or regressor depending on target dtype.
+
+        In-memory only — does not write an HTML report.
+
+        Returns:
+            Optional[Tuple[Dict, Dict]]: (metrics, html_kwargs) on success, or None if TSTR
+            could not run (missing scikit-learn or target_col not in both dataframes).
+        """
         try:
             from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
             from sklearn.metrics import (
@@ -109,8 +115,9 @@ class _MLUtilityMixin:
             if self.verbose:
                 logger.info("TSTR metrics (%s): %s", task_label, metrics)
 
-            # Generate HTML report
-            self._save_tstr_html(
+            # Stash the extra fields _run_tstr needs to render the HTML report,
+            # without polluting the metrics dict returned to callers of evaluate().
+            html_kwargs = dict(
                 metrics=metrics,
                 metric_labels=metric_labels,
                 metric_values=metric_values,
@@ -120,14 +127,29 @@ class _MLUtilityMixin:
                 target_col=target_col,
                 n_train=len(synthetic_df),
                 n_test=len(real_df),
-                output_dir=output_dir,
             )
-
-            return metrics
+            return metrics, html_kwargs
 
         except Exception as e:
             logger.error("TSTR failed: %s", e)
+            return None, None
+
+    def _run_tstr(
+        self,
+        real_df: pd.DataFrame,
+        synthetic_df: pd.DataFrame,
+        target_col: str,
+        output_dir: str,
+    ) -> Optional[Dict[str, Any]]:
+        """Computes TSTR metrics and saves tstr_report.html."""
+        result = self._compute_tstr(real_df, synthetic_df, target_col)
+        if result is None:
             return None
+        metrics, html_kwargs = result
+        if metrics is None:
+            return None
+        self._save_tstr_html(output_dir=output_dir, **html_kwargs)
+        return metrics
 
     def _save_tstr_html(
         self,
@@ -198,7 +220,7 @@ class _MLUtilityMixin:
     Train (synthetic): <strong>{n_train}</strong> rows &nbsp;|&nbsp;
     Test (real): <strong>{n_test}</strong> rows
   </p>
-  {fig.to_html(full_html=False, include_plotlyjs="cdn")}
+  {fig.to_html(full_html=False, include_plotlyjs=True)}
   <br>
   <table>
     <tr><th>Metric</th><th>Value</th></tr>

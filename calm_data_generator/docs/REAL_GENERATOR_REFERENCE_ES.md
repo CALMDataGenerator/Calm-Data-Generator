@@ -48,26 +48,26 @@ synthetic_df = gen.generate(
     data=df,                          # DataFrame original (requerido)
     n_samples=1000,                   # Número de muestras a generar (requerido)
     method="ctgan",                   # Método de síntesis
-    
+
     # Objetos de Configuración
     report_config=ReportConfig(       # Configuración de informes
         output_dir="./output",
         target_column="target"
     ),
-    
+
     # Inyección de Drift
     drift_injection_config=[
         DriftConfig(
             method="inject_feature_drift",
             feature_cols=["age"],
-            drift_type="shift", 
+            drift_type="shift",
             magnitude=0.5
         )
     ],
-    
+
     # Los argumentos legacy aún son soportados pero se recomiendan los objetos Config
-    # target_col="target", 
-    # output_dir="./output" 
+    # target_col="target",
+    # output_dir="./output"
 )
 ```
 
@@ -83,10 +83,11 @@ synthetic_df = gen.generate(
 | `generator_name` | str | `"RealGenerator"` | Nombre base para archivos de salida |
 | `save_dataset` | bool | `False` | Guardar dataset generado como CSV |
 | `custom_distributions` | Dict | `None` | Distribución forzada por columna |
+| `custom_distribution` | Dict | `None` | ⚠️ Alias legacy singular de `custom_distributions`. Registra un warning si se usa — se recomienda la forma plural. |
 | `date_col` | str | `None` | Nombre de columna de fecha a inyectar |
-| `date_start` | str | `None` | Fecha de inicio ("YYYY-MM-DD") |
-| `date_step` | Dict | `None` | Incremento temporal (ej., `{"days": 1}`) |
-| `date_every` | int | `1` | Incrementar fecha cada N filas |
+| `date_start` | str | `None` | ⚠️ Legacy. Fecha de inicio ("YYYY-MM-DD"). Registra un warning si se usa sin `date_config` — se recomienda `date_config=DateConfig(...)`. |
+| `date_step` | Dict | `None` | ⚠️ Legacy — misma nota que `date_start`. Incremento temporal (ej., `{"days": 1}`) |
+| `date_every` | int | `1` | ⚠️ Legacy — misma nota que `date_start`. Incrementar fecha cada N filas |
 | `drift_injection_config` | List[Union[Dict, DriftConfig]] | `None` | Configuración de drift post-generación |
 | `dynamics_config` | Dict | `None` | Configuración de evolución dinámica |
 | `**kwargs` | Dict | `None` | Hiperparámetros específicos  |
@@ -96,6 +97,36 @@ synthetic_df = gen.generate(
 | `date_config` | DateConfig | `None` | Objeto de configuración avanzada de inyección de fechas |
 | `balance` | bool | `False` | Balancear automáticamente la distribución de clases en `target_col` |
 | `**kwargs` | Any | - | Parámetros específicos del método (ej., `epochs`, `n_latent`, `lr`) |
+
+---
+
+## API más simple: `fit()` / `sample()`
+
+Para el caso más común — entrenar una vez, muestrear tantas veces como haga falta —
+`RealGenerator` ofrece una envoltura fina, estilo sklearn, sobre `generate()`:
+
+```python
+gen = RealGenerator(auto_report=False, random_state=42)
+
+# Entrena el modelo. No escribe ningún reporte/dataset a disco.
+gen.fit(df, method="cart", target_col="target")
+
+# Genera filas sintéticas del modelo ya entrenado, tantas veces como se quiera — sin reentrenar.
+synth_small = gen.sample(100)
+synth_large = gen.sample(10_000)
+
+# El encadenado también funciona:
+synth = RealGenerator().fit(df, method="ctgan").sample(1000)
+```
+
+- `fit(data, method="cart", target_col=None, **kwargs)` acepta los mismos argumentos de palabra
+  clave que `generate()` (menos `n_samples`, `output_dir`, `save_dataset`) y devuelve `self`.
+- `sample(n_samples)` lanza un `ValueError` claro si se llama antes de `fit()` (o `.load()`).
+- Internamente, `sample()` llama a `generate(data=None, n_samples=...)`, que ya podía reutilizar
+  un `self.synthesizer` previamente entrenado sin reentrenar — `fit()`/`sample()` simplemente
+  dan a esa capacidad ya existente un nombre más descubrible y convencional.
+- Para llamadas de un solo paso (entrenar + generar + reportar en una sola llamada), `generate()`
+  sigue siendo la opción correcta.
 
 ---
 
@@ -225,7 +256,7 @@ synthetic_df = gen.generate(
 
 # 2. Convertir de vuelta a AnnData para análisis con scanpy
 synthetic_adata = RealGenerator.to_anndata(
-    synthetic_df, 
+    synthetic_df,
     target_col="cell_type"
 )
 
@@ -424,7 +455,7 @@ Si tienes una columna `target` (ej. precio, churn) y la relación $X \rightarrow
 *   Especifica siempre `target_col="nombre_columna"`.
     ```python
     # El generador detecta automáticamente si es Regresión o Clasificación
-    gen.generate(data, target_col="precio", method="lgbm") 
+    gen.generate(data, target_col="precio", method="lgbm")
     ```
 
 ### 3. Clustering (No Supervisado)
@@ -444,7 +475,7 @@ Si tus datos están fragmentados lógicamente (ej: por Tiendas, Países, Pacient
 *   Usa **`RealBlockGenerator`** en lugar de `RealGenerator`.
     ```python
     block_gen = RealBlockGenerator()
-    block_gen.generate(data, block_column="TiendaID", method="cart") 
+    block_gen.generate(data, block_column="TiendaID", method="cart")
     ```
     *Esto entrena un modelo diferente para cada TiendaID.*
 
@@ -469,8 +500,8 @@ Si tu columna objetivo (`target`) tiene clases muy minoritarias que quieres pote
 
 ### `ddpm` - Synthcity TabDDPM (Difusión Tabular Avanzada)
 
-**Tipo:** Deep Learning (Modelo de Difusión)  
-**Mejor para:** Síntesis tabular de alta calidad, entornos de producción, grandes datasets  
+**Tipo:** Deep Learning (Modelo de Difusión)
+**Mejor para:** Síntesis tabular de alta calidad, entornos de producción, grandes datasets
 **Requisitos:** `synthcity` (incluido en la instalación base)
 
 #### Descripción
@@ -500,17 +531,17 @@ synth = gen.generate(
     data,
     method='ddpm',
     n_samples=1000,
-    
+
     # Training parameters
     n_iter=1000,                    # Training epochs (default: 1000)
     lr=0.002,                       # Learning rate (default: 0.002)
     batch_size=1024,                # Batch size (default: 1024)
-    
+
     # Diffusion parameters
     num_timesteps=1000,             # Diffusion timesteps (default: 1000)
     scheduler='cosine',             # 'cosine' or 'linear' (default: 'cosine')
     gaussian_loss_type='mse',       # 'mse' or 'kl' (default: 'mse')
-    
+
     # Model architecture
     model_type='mlp',               # 'mlp', 'resnet', or 'tabnet' (default: 'mlp')
     model_params={                  # Architecture-specific parameters
@@ -518,7 +549,7 @@ synth = gen.generate(
         'n_units_hidden': 256,
         'dropout': 0.0
     },
-    
+
     # Task type
     is_classification=False,        # True for classification tasks
 )
@@ -653,7 +684,7 @@ synth = gen.generate(
     data,
     method='timegan',
     n_samples=100,  # Número de secuencias a generar
-    
+
     # Parámetros de entrenamiento
     n_iter=1000,                    # Épocas de entrenamiento (defecto: 1000)
     n_units_hidden=100,             # Unidades ocultas en RNN (defecto: 100)
@@ -708,8 +739,8 @@ synth = gen.generate(
 
 ### `timevae` - TimeVAE (Time Series VAE)
 
-**Tipo:** Deep Learning (VAE para Series Temporales)  
-**Mejor para:** Series temporales regulares, entrenamiento más rápido que TimeGAN  
+**Tipo:** Deep Learning (VAE para Series Temporales)
+**Mejor para:** Series temporales regulares, entrenamiento más rápido que TimeGAN
 **Requisitos:** `synthcity` (incluido en la instalación base)
 
 #### Descripción
@@ -739,7 +770,7 @@ synth = gen.generate(
     data,
     method='timevae',
     n_samples=100,  # Number of sequences to generate
-    
+
     # Training parameters
     n_iter=1000,                    # Training epochs (default: 1000)
     decoder_n_layers_hidden=2,      # Decoder layers (default: 2)
@@ -908,8 +939,8 @@ synth = gen.generate(
 
 ### `fflows` - FourierFlows (Flujos Normalizantes en Dominio de Frecuencia)
 
-**Tipo:** Deep Learning (Normalizing Flows para Series Temporales)  
-**Mejor para:** Series temporales periódicas/quasi-periódicas, alternativa estable a TimeGAN  
+**Tipo:** Deep Learning (Normalizing Flows para Series Temporales)
+**Mejor para:** Series temporales periódicas/quasi-periódicas, alternativa estable a TimeGAN
 **Requisitos:** `synthcity`
 
 #### Descripción
@@ -942,8 +973,8 @@ synth = gen.generate(
 
 ### `bn` - Red Bayesiana (Bayesian Network)
 
-**Tipo:** Modelo Gráfico Probabilístico  
-**Mejor para:** Datos tabulares clínicos/estructurados con dependencias causales entre variables  
+**Tipo:** Modelo Gráfico Probabilístico
+**Mejor para:** Datos tabulares clínicos/estructurados con dependencias causales entre variables
 **Requisitos:** `synthcity`
 
 #### Descripción

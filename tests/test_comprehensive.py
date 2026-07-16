@@ -124,7 +124,7 @@ def test_clinical_data_generator():
     """Test basic ClinicalDataGenerator functionality."""
     from calm_data_generator.generators.clinical import ClinicalDataGenerator
 
-    clin_gen = ClinicalDataGenerator()
+    clin_gen = ClinicalDataGenerator(auto_report=False)
     result = clin_gen.generate(n_samples=10, n_genes=20, n_proteins=10)
     assert "demographics" in result
     assert len(result["demographics"]) == 10
@@ -134,7 +134,7 @@ def test_clinical_data_generator_longitudinal():
     """Test longitudinal clinical data generation."""
     from calm_data_generator.generators.clinical import ClinicalDataGenerator
 
-    clin_gen = ClinicalDataGenerator()
+    clin_gen = ClinicalDataGenerator(auto_report=False)
     result = clin_gen.generate_longitudinal_data(
         n_samples=5, longitudinal_config={"n_visits": 2}
     )
@@ -145,7 +145,7 @@ def test_drift_injector(sample_data):
     """Test standard drift injection methods."""
     from calm_data_generator.generators.drift import DriftInjector
 
-    injector = DriftInjector()
+    injector = DriftInjector(auto_report=False)
 
     # Gradual drift
     drifted = injector.inject_feature_drift_gradual(
@@ -174,7 +174,7 @@ def test_drift_injector_all_modes(sample_data):
     """Test abrupt drift mode."""
     from calm_data_generator.generators.drift import DriftInjector
 
-    injector = DriftInjector()
+    injector = DriftInjector(auto_report=False)
     drifted = injector.inject_drift(
         df=sample_data,
         columns="score",
@@ -189,7 +189,7 @@ def test_drift_config_usage(sample_data):
     """Test DriftConfig object usage with inject_multiple_types_of_drift."""
     from calm_data_generator.generators.drift import DriftInjector
 
-    injector = DriftInjector()
+    injector = DriftInjector(auto_report=False)
     config = DriftConfig(
         method="inject_drift",
         params={

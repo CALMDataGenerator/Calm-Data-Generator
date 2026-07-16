@@ -201,7 +201,7 @@ def generate_qq_plots(
 
         os.makedirs(output_dir, exist_ok=True)
         path = os.path.join(output_dir, filename)
-        fig.write_html(path, include_plotlyjs="cdn")
+        fig.write_html(path, include_plotlyjs=True)
         return path
 
     except Exception as e:

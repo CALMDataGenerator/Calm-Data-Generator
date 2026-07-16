@@ -244,7 +244,7 @@ class DiscriminatorReporter:
             width=700,
             height=500,
         )
-        roc_div = pio.to_html(fig, full_html=False, include_plotlyjs="cdn")
+        roc_div = pio.to_html(fig, full_html=False, include_plotlyjs=True)
 
         # Metrics Table (HTML)
         html_content = f"""
@@ -369,7 +369,7 @@ class DiscriminatorReporter:
             width=900,
             height=500,
         )
-        importance_div = pio.to_html(fig, full_html=False, include_plotlyjs="cdn")
+        importance_div = pio.to_html(fig, full_html=False, include_plotlyjs=True)
 
         # HTML Structure
         html_content = f"""

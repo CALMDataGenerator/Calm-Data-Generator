@@ -8,7 +8,7 @@ def test_clinical_generation_flow():
     """Test full Clinical Generator flow."""
     np.random.seed(42)
     try:
-        generator = ClinicalDataGenerator(seed=42)
+        generator = ClinicalDataGenerator(seed=42, auto_report=False)
         results = generator.generate(
             n_samples=50, n_genes=100, n_proteins=50, save_dataset=False
         )

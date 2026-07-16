@@ -4,6 +4,89 @@ Todos los cambios notables de CALM-Data-Generator están documentados aquí.
 
 ---
 
+## [2.3.0] — 2026-07-15
+
+### Nuevas funcionalidades
+
+- **`RealGenerator.fit(data)` / `.sample(n_samples)`**: API estilo sklearn. `fit()` entrena el
+  modelo una sola vez (sin escribir reporte ni dataset a disco); `sample()` genera filas
+  sintéticas del modelo ya entrenado tantas veces como haga falta, sin reentrenar. Es una
+  envoltura fina sobre la capacidad ya existente de reutilizar el modelo vía
+  `generate(data=None, n_samples=N)` — sin lógica de síntesis nueva. Soporta encadenado:
+  `RealGenerator().fit(df).sample(1000)`.
+- **`QualityReporter.evaluate(real_df, synthetic_df, target_column=None)`**: comprobación de
+  fidelidad ligera, en memoria — scores de calidad SDMetrics, tests de similitud estadística
+  (KS/MMD/Wasserstein) y TSTR (si se da `target_column`). No escribe nada a disco, a diferencia
+  de `generate_comprehensive_report()`.
+- **`generate_comprehensive_report()` ahora devuelve el dict de resultados** en vez de `None` —
+  el mismo dict que se escribe en `report_results.json` (scores de calidad, tests estadísticos,
+  TSTR, privacidad, ARI, etc.) ya está disponible directamente para quien la llama.
+- **Distancia de Wasserstein** añadida por columna numérica en los tests de similitud
+  estadística, junto al test KS, el test de Levene y el MMD ya existentes.
+- **NNDR (Nearest Neighbor Distance Ratio)** añadido a las métricas de privacidad, junto al
+  DCR. Extiende la comprobación de distancia al registro más cercano con un ratio invariante a
+  escala (distancia al más cercano / distancia al 2º más cercano de un registro real) — señal
+  más fuerte de riesgo de reidentificación.
+- **Riesgo de Singling-Out** vía [anonymeter](https://github.com/statice/anonymeter) (MIT),
+  nueva dependencia **opcional** (`pip install calm-data-generator[privacy]`). Estima el riesgo
+  de que un atacante aísle un registro real concreto a partir de combinaciones de atributos
+  aprendidas del sintético. Se activa automáticamente con `privacy_check=True`; degrada a `None`
+  con un log informativo (no un error) si `anonymeter` no está instalado. Su límite interno de
+  reintentos está acotado para que una sola evaluación sea rápida incluso con datos de baja
+  cardinalidad o muy duplicados (el propio default de anonymeter puede colgarse minutos en ese
+  caso).
+
+### Corrección de errores
+
+- **`RealGenerator.generate()` no tenía docstring en runtime**: el docstring estaba escrito
+  *después* de código ejecutable, convirtiéndose en un string muerto en vez de un docstring real
+  (`generate.__doc__` era `None`). Mismo problema corregido en `generate_custom` y en los 18
+  métodos `.generate()` de los presets.
+- **`from calm_data_generator import presets` lanzaba `RecursionError`**: el mapa de imports
+  perezosos tenía una entrada auto-referente para el subpaquete `presets`. Ahora se importa
+  directamente.
+- **`generate_comprehensive_report(report_config=..., discriminator=True/tstr=True/...)`
+  descartaba en silencio los flags booleanos explícitos** cuando también se pasaba
+  `report_config`. Ahora usa semántica OR para `privacy_check`/`discriminator`/`tstr`/`spearman`:
+  un flag pedido explícitamente siempre gana, incluso junto a un `report_config` que lo deja en
+  su valor por defecto. `tstr`/`spearman` son ahora campos propios de `ReportConfig` (antes solo
+  se podían fijar como argumentos sueltos del método).
+- **Excepción silenciosa en la generación scVI/scANVI con gene-label**
+  (`_synth_latent.py`): un `except Exception: pass` sin registro alrededor de la construcción
+  del tensor de etiquetas para `dispersion="gene-label"` ocultaba cualquier fallo y caía a
+  generación incondicional sin ninguna visibilidad. Ahora registra un warning con el motivo.
+
+### Experiencia de desarrollo
+
+- **`QualityReporter.generate_custom` y los 18 métodos `.generate()` de los presets tienen ahora
+  docstrings correctos** (antes indocumentados a nivel de `help()`/IDE).
+- **Los parámetros legacy de `generate()`** (`custom_distribution` alias singular,
+  `date_start`/`date_every`/`date_step`) ahora registran un warning apuntando al equivalente
+  moderno (`custom_distributions`, `date_config=DateConfig(...)`) cuando se usan. Nota: un
+  `warnings.warn()` normal habría quedado silenciado — `RealGenerator.py` suprime
+  `DeprecationWarning`/`UserWarning`/`FutureWarning` a nivel de módulo — así que se usa
+  `logger.warning()` en su lugar. El docstring de `generate()` también se reescribió, agrupando
+  sus ~25 parámetros por bloque (core, drift & dynamics, reporting, distribuciones, alias
+  legacy) en vez de una lista plana.
+- **Eliminado el árbol duplicado de la raíz del paquete**: `generators/`, `reports/`,
+  `presets/`, `docs/`, `tutorials/`, `cli.py`, `logger.py`, `__init__.py` existían tanto en la
+  raíz del repo como dentro de `calm_data_generator/` (el paquete instalable real) como copia
+  exacta y sin trackear — editar la copia de la raíz no tenía ningún efecto sobre el paquete
+  instalado. Eliminado.
+- **Eliminado el módulo `QualityReporter` duplicado**: `generators/tabular/QualityReporter.py`
+  era un shim de re-exportación de 5 líneas que colisionaba con la clase homónima ya
+  re-exportada por `generators/tabular/__init__.py`. La ruta de importación canónica es ahora
+  únicamente `calm_data_generator.reports.QualityReporter.QualityReporter`.
+- **Los reportes HTML son ahora totalmente autónomos**: 5 páginas de reporte
+  (`statistical_tests.html`, `spearman_heatmaps.html`, `qq_plots.html`, `tstr_report.html`, y 2
+  fragmentos en `DiscriminatorReporter`) cargaban Plotly desde un CDN y se renderizaban en
+  blanco sin conexión a internet. Ahora se empaquetan en línea, igual que el resto del
+  dashboard.
+- **El CI ahora avisa (sin bloquear) cuando un PR edita un lado de un par de docs EN/ES** (p.
+  ej. `README.md`/`README_ES.md`) sin el otro, vía un nuevo job `check-doc-pairs`.
+
+---
+
 ## [2.2.1] — 2026-04-29
 
 ### Nuevas Funcionalidades
