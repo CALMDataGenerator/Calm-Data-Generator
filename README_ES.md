@@ -656,9 +656,26 @@ Explora la documentación completa en el directorio `calm_data_generator/docs/`:
 
 ---
 
+## Autoría
+
+**Creado originalmente por** [Alejandro Belda Fernandez](mailto:a.beldafernandez@um.es) (Universidad de Murcia), que dirigió el desarrollo de la librería hasta la versión 2.3.0.
+
+**Mantenido actualmente por** [Antonio Guillen Teruel](mailto:a.guillenteruel@um.es) (Universidad de Murcia), a partir de la versión 2.3.0.
+
+La evaluación single-cell integrada mediante `use_scgft` se apoya en [scGFT Evaluator](https://github.com/nasim23ea/scgft-evaluator), cuyo autor es [Nasim El Arifi Ahmed](mailto:nasim.e.a@um.es) (Universidad de Murcia).
+
+Consulta [AUTHORS](AUTHORS) para la atribución completa y [CITATION.cff](CITATION.cff) si necesitas citar este software en trabajos académicos.
+
+**Contacto:** [calmdatagenerator@outlook.es](mailto:calmdatagenerator@outlook.es) — para dudas sobre la librería. Para errores y peticiones de funcionalidades, abre un [issue](https://github.com/AlejandroBeldaFernandez/Calm-Data-Generator/issues).
+
+---
+
 ## Licencia
 
 Licencia MIT - ver archivo [LICENSE](LICENSE)
+
+---
+
 ## Changelog
 
 Consulta [CHANGELOG_ES.md](CHANGELOG_ES.md) para el historial completo. Resumen de versiones recientes:

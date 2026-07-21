@@ -4,6 +4,25 @@ Todos los cambios notables de CALM-Data-Generator están documentados aquí.
 
 ---
 
+## [2.3.1] — 2026-07-21
+
+### Documentación
+
+- **Autoría y atribución documentadas en los ficheros del proyecto** (con independencia de
+  quién administre el repositorio de GitHub):
+  - `pyproject.toml`: autor original en `authors`, mantenedor actual y contacto del
+    proyecto en el nuevo campo `maintainers`.
+  - `CITATION.cff` (nuevo): metadatos de cita para que la librería se cite correctamente en
+    trabajos académicos — GitHub lo expone mediante el botón "Cite this repository".
+  - `AUTHORS` (nuevo): atribución completa, incluyendo el crédito al autor de
+    [scGFT Evaluator](https://github.com/nasim23ea/scgft-evaluator) por la evaluación
+    single-cell integrada mediante `use_scgft`.
+  - `README.md` / `README_ES.md`: sección de autoría y email de contacto del proyecto.
+- URLs del repositorio actualizadas al nombre actual (`Calm-Data-Generator`), que había
+  cambiado desde la última vez que se fijaron.
+
+---
+
 ## [2.3.0] — 2026-07-15
 
 ### Nuevas funcionalidades

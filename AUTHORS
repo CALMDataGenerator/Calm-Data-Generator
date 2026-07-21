@@ -1,0 +1,32 @@
+CALM-Data-Generator — Authors and Contributors
+==============================================
+
+Project contact: calmdatagenerator@outlook.es
+
+Authorship is documented here and in the project files (pyproject.toml,
+CITATION.cff, README). It is independent of who administers the GitHub
+repository, and the commit history remains the permanent record of
+individual contributions.
+
+
+Original author
+---------------
+Alejandro Belda Fernandez <a.beldafernandez@um.es>
+    Created the library and led its development through version 2.3.0.
+    Universidad de Murcia.
+
+
+Current maintainer
+------------------
+Antonio Guillen Teruel <a.guillenteruel@um.es>
+    Maintains the project from version 2.3.0 onwards.
+    Universidad de Murcia.
+
+
+Contributors
+------------
+Nasim El Arifi Ahmed <nasim.e.a@um.es>
+    Author of scGFT Evaluator (https://github.com/nasim23ea/scgft-evaluator),
+    the Graph Fourier Transform-based single-cell evaluation integrated into
+    QualityReporter via the `use_scgft` option.
+    Universidad de Murcia.

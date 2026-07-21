@@ -1,0 +1,35 @@
+cff-version: 1.2.0
+title: CALM-Data-Generator
+message: >-
+  If you use this software in your research, please cite it
+  using the metadata from this file.
+type: software
+authors:
+  - given-names: Alejandro
+    family-names: Belda Fernandez
+    email: a.beldafernandez@um.es
+    affiliation: Universidad de Murcia
+    website: 'https://github.com/AlejandroBeldaFernandez'
+  - given-names: Antonio
+    family-names: Guillen Teruel
+    email: a.guillenteruel@um.es
+    affiliation: Universidad de Murcia
+repository-code: 'https://github.com/AlejandroBeldaFernandez/Calm-Data-Generator'
+url: 'https://pypi.org/project/calm-data-generator/'
+contact:
+  - name: CALM-Data-Generator project
+    email: calmdatagenerator@outlook.es
+abstract: >-
+  A Python library for synthetic data generation with support for tabular,
+  clinical and single-cell data, drift injection for model robustness testing,
+  and quality, ML-utility and privacy assessment of the generated datasets.
+keywords:
+  - synthetic-data
+  - machine-learning
+  - data-generation
+  - drift-detection
+  - clinical-data
+  - privacy
+license: MIT
+version: 2.3.1
+date-released: '2026-07-21'

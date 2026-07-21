@@ -1,6 +1,6 @@
 # CALM-Data-Generator - Synthetic Data Generation Library
 
-__version__ = "2.3.0"
+__version__ = "2.3.1"
 
 __all__ = [
     "RealGenerator",

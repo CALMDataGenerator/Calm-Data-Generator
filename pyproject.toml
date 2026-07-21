@@ -4,13 +4,17 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "calm-data-generator"
-version = "2.3.0"
+version = "2.3.1"
 description = "CALM-Data-Generator: A Python library for synthetic data generation with support for drift injection and clinical data."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
 authors = [
   { name = "Alejandro Belda Fernandez", email = "alejandrobeldafernandez@gmail.com" },
+]
+maintainers = [
+  { name = "Antonio Guillen Teruel", email = "a.guillenteruel@um.es" },
+  { name = "CALM-Data-Generator project", email = "calmdatagenerator@outlook.es" },
 ]
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -61,8 +65,8 @@ dependencies = [
 ]
 
 [project.urls]
-"Homepage" = "https://github.com/AlejandroBeldaFernandez/Calm-Data_Generator"
-"Bug Tracker" = "https://github.com/AlejandroBeldaFernandez/Calm-Data_Generator/issues"
+"Homepage" = "https://github.com/AlejandroBeldaFernandez/Calm-Data-Generator"
+"Bug Tracker" = "https://github.com/AlejandroBeldaFernandez/Calm-Data-Generator/issues"
 [project.optional-dependencies]
 stream = [
     "river>=0.21.0"
